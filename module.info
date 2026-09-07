@@ -1,0 +1,5 @@
+desc=GoAccess Reports
+category=servers
+depends=2.670 cron virtual-server/8.2.0
+version=1.0.0
+os_support=*-linux freebsd
