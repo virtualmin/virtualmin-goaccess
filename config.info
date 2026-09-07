@@ -1,0 +1,5 @@
+goaccess=Full path to GoAccess,0
+timeout=Maximum report generation time in seconds,0
+max_logs=Maximum log files per report,0
+noedit=Allow domain owners to change report settings?,1,0-Yes,1-No
+schedule=Default update schedule,1,hourly-Hourly,daily-Daily,manual-Manual

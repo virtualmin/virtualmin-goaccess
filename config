@@ -1,0 +1,5 @@
+goaccess=/usr/bin/goaccess
+timeout=300
+max_logs=1000
+noedit=0
+schedule=hourly
