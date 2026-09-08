@@ -79,4 +79,53 @@ die "Too many rotated logs (limit $limit)\n" if @files > $limit;
 return \@files;
 }
 
+# collect_logs(paths, output) copies regular logs, including gzip files, once.
+# Opening as the domain owner permits normal log symlinks without root access.
+sub collect_logs
+{
+my ($paths, $output) = @_;
+open(my $out, '>', $output) or die "Cannot create log snapshot: $!\n";
+binmode($out);
+my (%seen, $bytes, $count);
+$bytes = $count = 0;
+foreach my $path (@$paths) {
+    # Nonblocking open prevents a replaced log from hanging on a pipe.
+    sysopen(my $in, $path, O_RDONLY | O_NONBLOCK)
+        or die "Cannot open access log $path: $!\n";
+    my @st = stat($in);
+    die "Access log is not a regular file: $path\n" unless @st && S_ISREG($st[2]);
+    next if $seen{"$st[0]:$st[1]"}++;
+    my $stream = $in;
+    my $compressed = $path =~ /\.gz\z/;
+    if ($compressed) {
+        # Strict decoding rejects broken archives instead of partial statistics.
+        $stream = IO::Uncompress::Gunzip->new($in, MultiStream => 1, Strict => 1,
+                                             Transparent => 0)
+            or die "Cannot decompress $path: $GunzipError\n";
+    }
+
+    # Limit uncompressed logs to their initial size so active writes cannot
+    # prolong the read. Compressed logs are read to the end of the archive.
+    my $remaining = $st[7];
+    my $last = '';
+    while ($compressed || $remaining > 0) {
+        my $length = $compressed || $remaining > 65536 ? 65536 : $remaining;
+        my $buf;
+        my $n = $compressed ? $stream->read($buf, $length) : read($stream, $buf, $length);
+        die "Cannot read $path\n" if !defined($n) || $n < 0;
+        last if !$n;
+        print {$out} $buf or die "Cannot write log snapshot: $!\n";
+        $last = substr($buf, -1);
+        $bytes += $n;
+        $remaining -= $n unless $compressed;
+    }
+    die "Cannot decompress $path: $GunzipError\n" if $compressed && $stream->error();
+    print {$out} "\n" if length($last) && $last ne "\n";
+    close($in);
+    $count++;
+}
+close($out) or die "Cannot close log snapshot: $!\n";
+return { files => $count, bytes => $bytes };
+}
+
 1;
