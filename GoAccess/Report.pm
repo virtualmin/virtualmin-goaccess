@@ -128,4 +128,45 @@ close($out) or die "Cannot close log snapshot: $!\n";
 return { files => $count, bytes => $bytes };
 }
 
+# html_escape(text) escapes titles placed in generated HTML.
+sub html_escape
+{
+my ($s) = @_;
+$s =~ s/&/&amp;/g;
+$s =~ s/</&lt;/g;
+$s =~ s/>/&gt;/g;
+$s =~ s/"/&quot;/g;
+$s =~ s/'/&#39;/g;
+return $s;
+}
+
+# command(binary, settings, title) builds an argument list for one HTML/JSON run.
+sub command
+{
+my ($binary, $s, $title) = @_;
+my @cmd = ($binary, '--no-global-config', '--no-progress', '--no-term-resolver',
+           '--log-file=input.log',
+           '--output=report.html', '--output=report.json',
+           '--html-report-title='.html_escape($title),
+           # Downloads default to GoAccess's bright theme. Inside Webmin,
+           # the frame applies the palette sent by the report page.
+           '--html-prefs='.encode_json({theme => 'bright', perPage => 10,
+                                       layout => 'horizontal', showTables => JSON::PP::true}),
+           '--max-items='.$s->{max_items});
+if ($s->{format} eq 'CUSTOM') {
+    # Pass each user-defined format as a single, validated argument.
+    push @cmd, '--log-format='.$s->{custom_format},
+               '--date-format='.$s->{date_format}, '--time-format='.$s->{time_format};
+}
+else {
+    # GoAccess expands the selected built-in format itself.
+    push @cmd, '--log-format='.$s->{format};
+}
+push @cmd, '--keep-last='.$s->{keep_days} if $s->{keep_days};
+push @cmd, '--anonymize-ip' if $s->{anonymize};
+push @cmd, '--no-query-string' if $s->{no_query};
+push @cmd, '--ignore-crawlers' if $s->{ignore_crawlers};
+return @cmd;
+}
+
 1;
