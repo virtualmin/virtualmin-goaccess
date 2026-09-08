@@ -169,4 +169,27 @@ push @cmd, '--ignore-crawlers' if $s->{ignore_crawlers};
 return @cmd;
 }
 
+# empty_report(title) writes HTML and JSON for a website with empty logs.
+# Inside Webmin, the page uses the palette sent to the report frame.
+sub empty_report
+{
+my ($title) = @_;
+my $escaped = html_escape($title);
+open(my $fh, '>', 'report.html') or die "Cannot create empty report: $!\n";
+print {$fh} '<!doctype html><html lang="en"><head><meta charset="utf-8">'.
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'.
+    "<title>$escaped</title><style>body{font:16px system-ui,sans-serif;".
+    'background:var(--ui-surface,#f1f5f9);color:var(--ui-fg,#172554);margin:0;padding:10vh 8vw}'.
+    'main{max-width:800px;margin:auto;background:var(--ui-surface-2,#fff);'.
+    'border:1px solid var(--ui-border,transparent);border-radius:8px;padding:40px}'.
+    'p{color:var(--ui-fg-muted,#475569)}</style></head><body>'.
+    "<main><h1>$escaped</h1><h2>No traffic yet</h2>".
+    '<p>The access logs are empty. Statistics will appear after your website receives requests and the report updates.</p></main></body></html>';
+close($fh) or die "Cannot save empty report: $!\n";
+open($fh, '>', 'report.json') or die "Cannot create report data: $!\n";
+print {$fh} encode_json({general => {total_requests => 0, valid_requests => 0,
+    failed_requests => 0, unique_visitors => 0, bandwidth => 0}});
+close($fh) or die "Cannot save report data: $!\n";
+}
+
 1;
