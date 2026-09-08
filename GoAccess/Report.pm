@@ -56,4 +56,27 @@ if ($s->{format} eq 'CUSTOM') {
 return $s;
 }
 
+# log_files(path, rotated, limit) finds standard numbered or dated rotations.
+# The parent lists files because the domain owner may have permission to open
+# known log paths but not list the directory. Only the worker reads the logs.
+sub log_files
+{
+my ($path, $rotated, $limit) = @_;
+die "The website has no usable access log\n"
+    unless defined($path) && $path =~ m{\A/} && $path !~ /[\x00-\x1f]/;
+my @files = ($path);
+if ($rotated) {
+    # Match only rotations belonging to this website's current access log.
+    my $dir = dirname($path);
+    my $base = basename($path);
+    opendir(my $dh, $dir) or die "Cannot read log directory $dir: $!\n";
+    push @files, map { "$dir/$_" } grep {
+        /\A\Q$base\E(?:\.\d+|-\d{8}(?:\d{6})?)(?:\.gz)?\z/
+    } readdir($dh);
+    closedir($dh);
+}
+die "Too many rotated logs (limit $limit)\n" if @files > $limit;
+return \@files;
+}
+
 1;
