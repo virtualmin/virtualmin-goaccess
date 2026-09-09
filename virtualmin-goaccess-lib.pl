@@ -66,4 +66,24 @@ die $err if $err;
 return $result;
 }
 
+# load_settings(domain) reads validated options, using defaults for a new site.
+sub load_settings
+{
+my ($d) = @_;
+my $file = &domain_dir($d).'/settings.json';
+return GoAccess::Report::defaults() unless -e $file;
+return GoAccess::Report::validate(decode_json(GoAccess::Report::read_regular($file, 16384)));
+}
+
+# save_settings(domain, settings) saves validated settings under the caller's lock.
+sub save_settings
+{
+my ($d, $s) = @_;
+$s = GoAccess::Report::validate($s);
+my $dir = &domain_dir($d);
+make_path($dir, { mode => 0700 }) unless -d $dir;
+&write_file_contents("$dir/settings.json", encode_json($s));
+return $s;
+}
+
 1;
