@@ -192,4 +192,25 @@ print {$fh} encode_json({general => {total_requests => 0, valid_requests => 0,
 close($fh) or die "Cannot save report data: $!\n";
 }
 
+# read_regular(path, limit) reads a regular file up to the given byte limit.
+# It rejects symlinks at the final path component and files with multiple links.
+sub read_regular
+{
+my ($path, $limit) = @_;
+sysopen(my $fh, $path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+    or die "Cannot read $path: $!\n";
+my @st = stat($fh);
+die "Invalid report file: $path\n" unless @st && S_ISREG($st[2]) && $st[3] == 1 && $st[7] <= $limit;
+my $data = '';
+while (1) {
+    my $n = read($fh, my $buf, 65536);
+    die "Cannot read $path: $!\n" unless defined($n);
+    last unless $n;
+    $data .= $buf;
+    die "Report file is too large\n" if length($data) > $limit;
+}
+close($fh);
+return $data;
+}
+
 1;
