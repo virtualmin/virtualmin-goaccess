@@ -33,4 +33,37 @@ die "Invalid domain ID\n" unless $d && $d->{'id'} =~ /\A\d+\z/;
 return &state_root()."/$d->{'id'}";
 }
 
+# domain_lock(domain, code, [wait]) locks report files; updates fail fast by default.
+# Lock files outlive report directories so deletion cannot create a second lock.
+sub domain_lock
+{
+my ($d, $code, $wait) = @_;
+my $dir = &domain_dir($d);
+sysopen(my $lock, "$dir.lock", O_RDWR | O_CREAT | O_NOFOLLOW, 0600)
+    or die "Cannot open report lock: $!\n";
+flock($lock, LOCK_EX | ($wait ? 0 : LOCK_NB))
+    or die "This report is being updated. Try again shortly.\n";
+my ($result, $err);
+eval { $result = $code->($dir); };
+$err = $@;
+close($lock);
+die $err if $err;
+return $result;
+}
+
+# state_lock(domain, code) waits for updates before changing or backing up state.
+# Take Virtualmin's domain lock before the report lock to match lifecycle callers.
+# Generation only needs the report lock and never waits for the domain lock.
+sub state_lock
+{
+my ($d, $code) = @_;
+my $locked = &virtual_server::lock_domain($d);
+my $result = eval { &domain_lock($d, $code, 1) };
+my $err = $@;
+# Webmin locks are not reference counted; leave a caller's existing lock intact.
+&virtual_server::unlock_domain($d) if $locked;
+die $err if $err;
+return $result;
+}
+
 1;
