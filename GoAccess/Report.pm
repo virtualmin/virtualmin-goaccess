@@ -213,4 +213,114 @@ close($fh);
 return $data;
 }
 
+# generate(options) runs the parser with the site's UID/GID and a time limit.
+# Required: binary, settings, title, log, uid, gid, timeout, max_logs.
+# Returns HTML and summary data; it does not modify the last published report.
+sub generate
+{
+my ($o) = @_;
+my $s = validate($o->{settings});
+die "Invalid GoAccess executable\n" unless $o->{binary} =~ m{\A/} && -x $o->{binary};
+foreach my $k (qw(uid gid timeout max_logs)) {
+    die "Invalid $k\n" unless defined($o->{$k}) && $o->{$k} =~ /\A\d+\z/;
+}
+die "Invalid generation limits\n" unless $o->{timeout} >= 1 && $o->{timeout} <= 3600
+    && $o->{max_logs} >= 1 && $o->{max_logs} <= 10000;
+die "Reports must run as a non-root domain user\n" if $o->{uid} == 0;
+my $logs = log_files($o->{log}, $s->{rotated}, $o->{max_logs});
+
+my $work = tempdir('virtualmin-goaccess-XXXXXXXX', TMPDIR => 1);
+my $stage = "$work/stage";
+my ($result, $error, $pid);
+eval {
+    # A root-owned parent protects the worker directory's name from replacement.
+    mkdir($stage, 0700) or die "Cannot create work directory: $!\n";
+    chown($o->{uid}, $o->{gid}, $stage) == 1 or die "Cannot set work directory owner: $!\n";
+    # Pre-open diagnostics so failure messages need no privileged file access.
+    open(my $diagnostics, '+>', "$work/diagnostics") or die "Cannot create diagnostics: $!\n";
+    $pid = fork();
+    die "Cannot start report worker: $!\n" unless defined($pid);
+    if (!$pid) {
+        eval {
+            # Webmin's in-process CGI runner ties standard handles to HTTP.
+            # The worker must detach them before redirecting or executing tools.
+            untie(*STDIN);
+            untie(*STDOUT);
+            untie(*STDERR);
+            setpgid(0, 0) == 0 or die "Cannot isolate report worker: $!\n";
+            chdir($stage) or die "Cannot enter work directory: $!\n";
+            open(STDIN, '<', '/dev/null') or die "Cannot redirect input: $!\n";
+            open(STDOUT, '>&', $diagnostics) or die "Cannot redirect output: $!\n";
+            open(STDERR, '>&', $diagnostics) or die "Cannot redirect errors: $!\n";
+
+            # Clear inherited Webmin and loader settings before parsing log data.
+            %ENV = (PATH => '/usr/bin:/bin', LC_ALL => 'C', HOME => '.');
+            umask(0077);
+            if ($> == 0) {
+                # Drop supplementary groups as well as the root UID and GID.
+                $) = "$o->{gid} $o->{gid}";
+                POSIX::setgid($o->{gid}) == 0 or die "Cannot set report group: $!\n";
+                POSIX::setuid($o->{uid}) == 0 or die "Cannot set report user: $!\n";
+            }
+            die "Incorrect report identity\n" if $> != $o->{uid} || $< != $o->{uid};
+            my $info = collect_logs($logs, 'input.log');
+            open(my $meta, '>', 'input.json') or die "Cannot create input metadata: $!\n";
+            print {$meta} encode_json($info);
+            close($meta) or die "Cannot save input metadata: $!\n";
+            if (!$info->{bytes}) {
+                # GoAccess rejects empty input, which is normal for a new site.
+                empty_report($o->{title});
+            }
+            else {
+                # Use list-form execution so log formats never reach a shell.
+                my @cmd = command($o->{binary}, $s, $o->{title});
+                system { $cmd[0] } @cmd;
+                die "GoAccess failed (status $?)\n" if $?;
+            }
+        };
+        if ($@) {
+            # Exit without inherited Webmin cleanup handlers in the forked worker.
+            my $err = $@;
+            syswrite($diagnostics, $err, length($err));
+            _exit(1);
+        }
+        _exit(0);
+    }
+
+    # Kill the process group on timeout, including any running parser child.
+    my $deadline = time() + $o->{timeout};
+    my $status;
+    while (1) {
+        my $wait = waitpid($pid, WNOHANG);
+        if ($wait == $pid) { $status = $?; last; }
+        die "Cannot wait for report worker: $!\n" if $wait < 0;
+        die "Report generation timed out after $o->{timeout} seconds\n" if time() >= $deadline;
+        sleep(0.1);
+    }
+    $pid = undef;
+    seek($diagnostics, 0, 0);
+    read($diagnostics, my $output, 16384);
+    close($diagnostics);
+    die ($output || "Report generation failed (status $status)\n") if $status;
+
+    my $html = read_regular("$stage/report.html", 256*1024*1024);
+    die "GoAccess did not create an HTML report\n" unless $html =~ /<!doctype html|<html/i;
+    my $json = decode_json(read_regular("$stage/report.json", 64*1024*1024));
+    die "GoAccess did not create report statistics\n" unless ref($json->{general}) eq 'HASH';
+    my $input = decode_json(read_regular("$stage/input.json", 4096));
+    $result = { html => $html, general => $json->{general}, input => $input,
+                generated => int(time()), settings => $s };
+};
+$error = $@;
+if ($pid) {
+    # An exception before reaping must not leave the parser running after failure.
+    kill('KILL', -$pid);
+    kill('KILL', $pid);
+    waitpid($pid, 0);
+}
+remove_tree($work, { safe => 1 });
+die $error if $error;
+return $result;
+}
+
 1;
