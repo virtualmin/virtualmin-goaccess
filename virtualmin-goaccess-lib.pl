@@ -86,4 +86,13 @@ make_path($dir, { mode => 0700 }) unless -d $dir;
 return $s;
 }
 
+# report_status(domain) reads the last successful report summary and latest error.
+sub report_status
+{
+my ($d) = @_;
+my $file = &domain_dir($d).'/status.json';
+return {} unless -e $file;
+return decode_json(GoAccess::Report::read_regular($file, 65536));
+}
+
 1;
