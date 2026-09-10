@@ -95,4 +95,26 @@ return {} unless -e $file;
 return decode_json(GoAccess::Report::read_regular($file, 65536));
 }
 
+# allowed_domain(id, [permission]) checks Virtualmin scope and action permissions.
+sub allowed_domain
+{
+my ($id, $permission) = @_;
+return undef unless defined($id) && $id =~ /\A\d+\z/;
+my $d = &virtual_server::get_domain($id);
+return undef unless $d && $d->{$module_name};
+return undef unless &virtual_server::can_edit_domain($d);
+return undef if $permission && !$access{$permission};
+# Apply the administrator's owner restriction even before ACLs are regenerated.
+return undef if $permission && $permission eq 'configure' &&
+    $config{'noedit'} && $access{'noconfig'};
+return $d;
+}
+
+# require_domain(id, [permission]) denies CGI requests outside the user's scope.
+sub require_domain
+{
+my ($id, $permission) = @_;
+return &allowed_domain($id, $permission) || &error($text{'error_access'});
+}
+
 1;
