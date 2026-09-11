@@ -198,4 +198,48 @@ return $text{'error_limits'} unless ($config{'timeout'} || '') =~ /\A\d+\z/
 return undef;
 }
 
+# generate_report(domain) rebuilds the dashboard from available website logs.
+# The old HTML remains intact if collection, parsing or validation fails.
+sub generate_report
+{
+my ($d) = @_;
+return &domain_lock($d, sub {
+    my ($dir) = @_;
+    die $text{'error_disabled'}."\n" if $d->{'disabled'} || -e "$dir/paused";
+    my $settings = &load_settings($d);
+    my $status = &report_status($d);
+    my $result;
+    make_path($dir, {mode => 0700}) unless -d $dir;
+    eval {
+        # Loading a web-server plugin can rebind Webmin package globals.
+        # Resolve the log before reading the module's configuration values.
+        my $log = &virtual_server::get_website_log($d);
+        # Create a missing log so a new website can produce an empty report.
+        &create_website_log($d, $log);
+        my $err = &check_goaccess();
+        die "$err\n" if $err;
+        my @user = getpwnam($d->{'user'});
+        die "The domain owner does not exist\n" unless @user;
+        $result = GoAccess::Report::generate({binary => $config{'goaccess'},
+            settings => $settings, title => "$d->{'dom'} — Web statistics",
+            log => $log, uid => $user[2], gid => $user[3],
+            timeout => $config{'timeout'}, max_logs => $config{'max_logs'}});
+        # Webmin writes a temporary file and renames it, so a failed write
+        # leaves the previous report in place.
+        &write_file_contents("$dir/report.html", delete($result->{'html'}));
+        $status = $result;
+    };
+    my $err = $@;
+    if ($err) {
+        # Keep the successful report's timestamp and statistics on failure.
+        $err =~ s/\e\[[0-9;]*[A-Za-z]//g;
+        $status->{'error'} = substr($err, 0, 16384);
+        $status->{'attempted'} = time();
+    }
+    &write_file_contents("$dir/status.json", encode_json($status));
+    die $err if $err;
+    return $status;
+});
+}
+
 1;
