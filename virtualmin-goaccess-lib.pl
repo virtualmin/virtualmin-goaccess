@@ -16,6 +16,50 @@ require "$module_root_directory/GoAccess/Report.pm";
 %access = &get_module_acl();
 our $cron_cmd = "$module_config_directory/goaccess.pl";
 
+# create_website_log(domain, path) creates an empty log if the path is missing.
+# Use the domain owner within its home directory and root elsewhere, then
+# apply the web server's log permissions. Leave existing files and symlinks
+# untouched. Return 1 if a file was created, or 0 if the path was skipped.
+sub create_website_log
+{
+my ($d, $log) = @_;
+return 0 unless ($log || '') =~ m{\A/[^\x00-\x1f]*\z} && !-l $log && !-e $log;
+my $dir = $log =~ m{\A(.*)/[^/]*\z} ? $1 || '/' : '/';
+if (&virtual_server::is_under_directory($d->{'home'}, $dir)) {
+    # A log under the home directory is created as its owner, so a link
+    # planted there cannot redirect a privileged write.
+    &virtual_server::make_dir_as_domain_user($d, $dir, 0711, 1) unless -d $dir;
+    my $fh = 'LOG';
+    &virtual_server::open_tempfile_as_domain_user($d, $fh, ">$log", 1, 1)
+        or die "Cannot create access log $log\n";
+    &virtual_server::close_tempfile_as_domain_user($d, $fh)
+        or die "Cannot create access log $log\n";
+}
+else {
+    # Outside the home directory, create the file as root. Exclusive open
+    # refuses an existing file or symlink at the log path.
+    &make_dir($dir, 0711, 1) unless -d $dir;
+    sysopen(my $fh, $log, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0660)
+        or die "Cannot create access log $log: $!\n";
+    close($fh);
+}
+# Ownership follows the web server's own rules, or else the domain's group.
+my $web = &virtual_server::domain_has_website($d) || '';
+if ($web eq 'web') {
+    &virtual_server::set_apache_log_permissions($d, $log);
+}
+elsif (&virtual_server::plugin_defined($web, 'set_nginx_log_permissions')) {
+    &virtual_server::plugin_call($web, 'set_nginx_log_permissions', $d, $log);
+}
+elsif (&virtual_server::is_under_directory($d->{'home'}, $log)) {
+    &virtual_server::set_permissions_as_domain_user($d, 0660, $log);
+}
+else {
+    &set_ownership_permissions($d->{'uid'}, $d->{'gid'}, 0660, $log);
+}
+return 1;
+}
+
 # state_root() returns the private directory for reports, settings and locks.
 sub state_root
 {
