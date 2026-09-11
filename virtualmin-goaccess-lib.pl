@@ -198,6 +198,28 @@ return $text{'error_limits'} unless ($config{'timeout'} || '') =~ /\A\d+\z/
 return undef;
 }
 
+# cron_command(domain) returns the domain's scheduled update command.
+# The wrapper is stored in Webmin's module configuration directory.
+sub cron_command
+{
+my ($d) = @_;
+&domain_dir($d);
+return "$cron_cmd --domain $d->{'id'}";
+}
+
+# find_cron_jobs(domain) returns this module's jobs without matching other tasks.
+# Jobs written by early versions with an escaped path are matched too, so a
+# schedule change replaces them instead of leaving a duplicate.
+sub find_cron_jobs
+{
+my ($d) = @_;
+&foreign_require('cron', 'cron-lib.pl');
+my %mine = map { $_ => 1 } (&cron_command($d),
+                            &quote_path($cron_cmd)." --domain $d->{'id'}");
+return grep { $_->{'user'} eq 'root' && $mine{$_->{'command'} || ''} }
+    &cron::list_cron_jobs();
+}
+
 # generate_report(domain) rebuilds the dashboard from available website logs.
 # The old HTML remains intact if collection, parsing or validation fails.
 sub generate_report
