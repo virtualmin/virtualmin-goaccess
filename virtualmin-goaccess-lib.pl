@@ -60,6 +60,31 @@ else {
 return 1;
 }
 
+# log_data(domain, settings) totals the on-disk sizes of regular access logs,
+# including rotations when enabled. Compressed sizes are counted as stored.
+# Return 0 for empty or not-yet-created logs; report discovery and file errors.
+sub log_data
+{
+my ($d, $settings) = @_;
+my $log = &virtual_server::get_website_log($d);
+my $files = GoAccess::Report::log_files($log, $settings->{'rotated'},
+                                      $config{'max_logs'});
+my $bytes = 0;
+foreach my $file (@$files) {
+    my @st = stat($file);
+    if (!@st) {
+        # A new site may not have a current log yet. Broken links and missing
+        # rotations must be reported because report generation would fail too.
+        my $err = "$!";
+        next if $! == ENOENT && $file eq $log && !-l $file;
+        die "Cannot inspect access log $file: $err\n";
+    }
+    die "Access log is not a regular file: $file\n" unless -f _;
+    $bytes += $st[7];
+}
+return $bytes;
+}
+
 # state_root() returns the private directory for reports, settings and locks.
 sub state_root
 {
