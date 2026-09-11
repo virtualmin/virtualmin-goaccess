@@ -117,4 +117,16 @@ my ($id, $permission) = @_;
 return &allowed_domain($id, $permission) || &error($text{'error_access'});
 }
 
+# check_goaccess() reports an unavailable binary or invalid administrator limits.
+sub check_goaccess
+{
+return $text{'error_binary'} unless ($config{'goaccess'} || '') =~ m{\A/}
+    && -x $config{'goaccess'};
+return $text{'error_limits'} unless ($config{'timeout'} || '') =~ /\A\d+\z/
+    && $config{'timeout'} >= 1 && $config{'timeout'} <= 3600
+    && ($config{'max_logs'} || '') =~ /\A\d+\z/
+    && $config{'max_logs'} >= 1 && $config{'max_logs'} <= 10000;
+return undef;
+}
+
 1;
