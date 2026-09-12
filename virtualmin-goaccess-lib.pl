@@ -220,6 +220,33 @@ return grep { $_->{'user'} eq 'root' && $mine{$_->{'command'} || ''} }
     &cron::list_cron_jobs();
 }
 
+# sync_cron(domain, settings, [paused]) replaces the domain's scheduled update.
+# Call under state_lock; settings may be undef when paused to remove jobs only.
+sub sync_cron
+{
+my ($d, $s, $paused) = @_;
+&foreign_require('cron', 'cron-lib.pl');
+# state_lock already holds the domain lock; only root's crontab changes here.
+&virtual_server::obtain_lock_cron();
+my $err;
+eval {
+    # Reuse Virtualmin's root crontab lock across all report schedules.
+    foreach my $job (&find_cron_jobs($d)) { &cron::delete_cron_job($job); }
+    &create_wrapper($cron_cmd, $module_name, 'goaccess.pl') unless $paused;
+    # Suspended domains and manual schedules must not retain an active job.
+    if (!$paused && !$d->{'disabled'} && $s->{'schedule'} ne 'manual') {
+        my $slot = $d->{'id'} % 60;
+        &cron::create_cron_job({ user => 'root', command => &cron_command($d),
+            active => 1, mins => $slot,
+            hours => $s->{'schedule'} eq 'daily' ? ($d->{'id'} % 24) : '*',
+            days => '*', months => '*', weekdays => '*' });
+    }
+};
+$err = $@;
+&virtual_server::release_lock_cron();
+die $err if $err;
+}
+
 # generate_report(domain) rebuilds the dashboard from available website logs.
 # The old HTML remains intact if collection, parsing or validation fails.
 sub generate_report
