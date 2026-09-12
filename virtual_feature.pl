@@ -51,4 +51,12 @@ return $alias || $subdomain ? 0 : 1;
 # feature_clash(domain, [field]) allows coexistence with existing statistics tools.
 sub feature_clash { return undef; }
 
+# feature_import(domain-name, username, database) checks for existing settings.
+sub feature_import
+{
+my ($name) = @_;
+my $d = &virtual_server::get_domain_by('dom', $name);
+return $d && -f (&domain_dir($d).'/settings.json') ? 1 : 0;
+}
+
 1;
