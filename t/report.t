@@ -7,6 +7,20 @@ use FindBin;
 use lib "$FindBin::Bin/..";
 use GoAccess::Report;
 
+# The cron entry point must reject web execution before loading Webmin or data.
+{
+    local $ENV{REQUEST_METHOD} = 'GET';
+    my $output;
+    {
+        open(my $fh, '-|', $^X, '-e', 'open STDERR, ">&STDOUT"; do $ARGV[0]; die $@ if $@;',
+             "$FindBin::Bin/../goaccess.pl") or die $!;
+        local $/;
+        $output = <$fh>;
+        close($fh);
+    }
+    like($output, qr/root command-line use only/, 'cron entry point rejects HTTP context');
+}
+
 my $settings = GoAccess::Report::defaults();
 is($settings->{format}, 'COMBINED', 'combined log format by default');
 ok($settings->{anonymize} && $settings->{no_query}, 'privacy options on by default');
