@@ -90,4 +90,20 @@ my $ok = eval {
 return $ok ? 1 : 0;
 }
 
+# feature_modify(domain, old-domain) preserves ID-based storage on rename/move.
+sub feature_modify
+{
+my ($d, $old) = @_;
+&state_lock($d, sub {
+    my ($dir) = @_;
+    &sync_cron($d, &load_settings($d), -e "$dir/paused");
+    # Remove a stale title after a rename; the next update uses the live domain.
+    if ($d->{'dom'} ne $old->{'dom'}) {
+        unlink("$dir/report.html");
+        unlink("$dir/status.json");
+    }
+});
+return 1;
+}
+
 1;
