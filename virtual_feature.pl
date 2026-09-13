@@ -149,4 +149,19 @@ my ($d) = @_;
 return 1;
 }
 
+# feature_webmin(domain, domains) grants access to reports owned by this account.
+sub feature_webmin
+{
+my ($d, $domains) = @_;
+return () unless grep { $_->{$module_name} } @$domains;
+return ([$module_name, {noconfig => 1,
+    configure => $config{'noedit'} ? 0 : 1, generate => 1}]);
+}
+
+# feature_modules() describes the module available to domain owners.
+sub feature_modules
+{
+return ([$module_name, $text{'index_title'}, undef, 'config_avail', $module_name]);
+}
+
 1;
