@@ -164,4 +164,38 @@ sub feature_modules
 return ([$module_name, $text{'index_title'}, undef, 'config_avail', $module_name]);
 }
 
+# feature_backup_name() describes the contents in Virtualmin backup options.
+sub feature_backup_name { return $text{'feat_backup_name'}; }
+
+# feature_backup(domain, file, options, home-format, differential, as-owner)
+# saves settings and the report snapshot. The file is written as the domain
+# user, so backups that Virtualmin runs as the owner work too.
+sub feature_backup
+{
+my ($d, $file) = @_;
+&$virtual_server::first_print($text{'feat_backup'});
+my $ok = eval {
+    &state_lock($d, sub {
+        my ($dir) = @_;
+        my $backup = {version => 1, settings => &load_settings($d)};
+        # A newly enabled site may have settings without a generated report.
+        if (-f "$dir/report.html") {
+            $backup->{'report'} = GoAccess::Report::read_regular("$dir/report.html", 256*1024*1024);
+            $backup->{'status'} = &report_status($d);
+        }
+        # Virtualmin writes the file in a process running as the domain user.
+        my $fh = 'BACKUP';
+        &virtual_server::open_tempfile_as_domain_user($d, $fh, ">$file", 1, 1)
+            or die "Cannot write GoAccess backup: $!\n";
+        &print_tempfile($fh, encode_json($backup));
+        # With no-error mode, the caller must check for a failed final write.
+        &virtual_server::close_tempfile_as_domain_user($d, $fh)
+            or die "Cannot finish writing GoAccess backup\n";
+    });
+    1;
+};
+&$virtual_server::second_print($ok ? $virtual_server::text{'setup_done'} : &feature_failed($@));
+return $ok ? 1 : 0;
+}
+
 1;
