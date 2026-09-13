@@ -122,4 +122,31 @@ my ($d) = @_;
 return 1;
 }
 
+# feature_disable(domain) pauses updates while retaining the last report.
+sub feature_disable
+{
+my ($d) = @_;
+&state_lock($d, sub {
+    my ($dir) = @_;
+    # Suspension must work even if report settings are missing or damaged.
+    make_path($dir, { mode => 0700 }) unless -d $dir;
+    &write_file_contents("$dir/paused", "1\n");
+    &sync_cron($d, undef, 1);
+});
+return 1;
+}
+
+# feature_enable(domain) resumes the saved schedule after a suspension.
+sub feature_enable
+{
+my ($d) = @_;
+&state_lock($d, sub {
+    my ($dir) = @_;
+    unlink("$dir/paused");
+    my %enabled = (%$d, disabled => 0);
+    &sync_cron(\%enabled, &load_settings($d));
+});
+return 1;
+}
+
 1;
