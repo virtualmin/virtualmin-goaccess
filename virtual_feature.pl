@@ -106,4 +106,20 @@ my ($d, $old) = @_;
 return 1;
 }
 
+# feature_delete(domain) removes only this domain's settings, report and job.
+sub feature_delete
+{
+my ($d) = @_;
+&$virtual_server::first_print($text{'feat_delete'});
+&state_lock($d, sub {
+    my ($dir) = @_;
+    # Damaged settings must not prevent removal of the feature or domain.
+    &sync_cron($d, undef, 1);
+    remove_tree($dir, {safe => 1});
+    die "Cannot remove report directory\n" if -e $dir;
+});
+&$virtual_server::second_print($virtual_server::text{'setup_done'});
+return 1;
+}
+
 1;
