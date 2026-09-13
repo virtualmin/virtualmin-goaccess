@@ -59,4 +59,35 @@ my $d = &virtual_server::get_domain_by('dom', $name);
 return $d && -f (&domain_dir($d).'/settings.json') ? 1 : 0;
 }
 
+# feature_setup(domain) creates private settings and the domain's cron job.
+sub feature_setup
+{
+my ($d) = @_;
+&$virtual_server::first_print($text{'feat_setup'});
+my $ok = eval {
+    die $text{'feat_alias'}."\n" if $d->{'alias'} || $d->{'subdom'};
+    my $err = &check_goaccess() || &feature_depends($d);
+    die "$err\n" if $err;
+    &state_lock($d, sub {
+        my ($dir) = @_;
+        my $s = &load_settings($d);
+        # Apply the administrator's defaults only when first enabling reports.
+        if (!-f "$dir/settings.json") {
+            $s->{'schedule'} = $config{'schedule'} || 'hourly';
+            # Standard Apache common logs lack referrer and browser fields.
+            if ($d->{'web'}) {
+                my ($virt, $vconf) = &virtual_server::get_apache_virtual($d->{'dom'}, $d->{'web_port'});
+                my $clog = $virt ? &apache::find_directive('CustomLog', $vconf) : '';
+                $s->{'format'} = 'COMMON' if ($clog || '') =~ /\bcommon\s*$/i;
+            }
+        }
+        &save_settings($d, $s);
+        &sync_cron($d, $s);
+    });
+    1;
+};
+&$virtual_server::second_print($ok ? $virtual_server::text{'setup_done'} : &feature_failed($@));
+return $ok ? 1 : 0;
+}
+
 1;
