@@ -234,4 +234,23 @@ my $ok = eval {
 return $ok ? 1 : 0;
 }
 
+# feature_validate(domain) checks the executable, domain requirements,
+# settings and scheduled update job.
+sub feature_validate
+{
+my ($d) = @_;
+my $error = &check_goaccess() || &feature_depends($d);
+return $error if $error;
+my $dir = &domain_dir($d);
+return $text{'feat_missing'} unless -f "$dir/settings.json";
+my $s = eval { &load_settings($d) };
+return &html_escape($@) if $@;
+# Only an active scheduled report needs a cron job to pass validation.
+if ($s->{'schedule'} ne 'manual' && !$d->{'disabled'} && !-e "$dir/paused") {
+    my @jobs = &find_cron_jobs($d);
+    return $text{'feat_cron'} unless @jobs == 1 && $jobs[0]->{'active'};
+}
+return undef;
+}
+
 1;
