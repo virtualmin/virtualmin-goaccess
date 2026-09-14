@@ -198,4 +198,40 @@ my $ok = eval {
 return $ok ? 1 : 0;
 }
 
+# feature_restore(domain, file, options, all-options) validates and restores
+# settings and the saved report, then rebuilds the update schedule.
+sub feature_restore
+{
+my ($d, $file) = @_;
+&$virtual_server::first_print($text{'feat_restore'});
+my $ok = eval {
+    my $backup = decode_json(GoAccess::Report::read_regular($file, 512*1024*1024));
+    die "Unsupported GoAccess backup\n" unless ref($backup) eq 'HASH' && ($backup->{'version'} || 0) == 1;
+    my $s = GoAccess::Report::validate($backup->{'settings'});
+    die "Invalid report in backup\n" if exists($backup->{'report'}) &&
+        (ref($backup->{'report'}) || !defined($backup->{'report'}) ||
+         length($backup->{'report'}) > 256*1024*1024 || $backup->{'report'} !~ /<!doctype html|<html/i);
+    my $status = $backup->{'status'} || {};
+    die "Invalid report summary in backup\n" unless ref($status) eq 'HASH' && length(encode_json($status)) <= 65536;
+    &state_lock($d, sub {
+        my ($dir) = @_;
+        &save_settings($d, $s);
+        # Restore the matching snapshot, or discard one absent from the backup.
+        if (exists($backup->{'report'})) {
+            &write_file_contents("$dir/report.html", $backup->{'report'});
+            &write_file_contents("$dir/status.json", encode_json($status));
+        }
+        else {
+            # A settings-only backup must not retain unrelated old statistics.
+            unlink("$dir/report.html");
+            unlink("$dir/status.json");
+        }
+        &sync_cron($d, $s, -e "$dir/paused");
+    });
+    1;
+};
+&$virtual_server::second_print($ok ? $virtual_server::text{'setup_done'} : &feature_failed($@));
+return $ok ? 1 : 0;
+}
+
 1;
