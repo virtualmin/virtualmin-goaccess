@@ -74,4 +74,30 @@ if (&virtual_server::domain_has_website($d) eq 'web') {
 is($status->{general}->{valid_requests}, 0, 'empty website gets a valid report');
 like(GoAccess::Report::read_regular("$dir/report.html", 1024*1024), qr/No traffic yet/, 'empty report explains its state');
 is(&log_data($d, &load_settings($d)), 0, 'empty logs offer nothing to report');
+write_log($log, entry('21', '192.0.2.10', '/first?private=value').entry('21', '198.51.100.12', '/missing', 404));
+write_log("$log.1", entry('20', '203.0.113.15', '/previous'));
+my $archived = entry('19', '192.0.2.30', '/archive');
+gzip(\$archived, "$log.2.gz") or die $GzipError;
+chown($owner[2], $owner[3], "$log.2.gz");
+chmod(0640, "$log.2.gz");
+ok(&log_data($d, &load_settings($d)) > 0, 'logged requests are detected');
+# Discovery failures must reach the page instead of appearing as empty logs.
+{
+    local $config{max_logs} = 1;
+    eval { &log_data($d, &load_settings($d)); };
+    like($@, qr/Too many rotated logs/, 'log-data check reports the configured file limit');
+}
+$status = &generate_report($d);
+is($status->{general}->{valid_requests}, 4, 'current and compressed rotated requests counted');
+is($status->{input}->{files}, 3, 'all three input files recorded');
+my $html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+like($html, qr/<!doctype html/i, 'standalone HTML generated');
+like($html, qr/GoAccess/, 'GoAccess dashboard generated');
+unlike($html, qr/private=value/, 'query strings removed from the dashboard');
+unlike($html, qr/192\.0\.2\.10/, 'client IP address anonymized');
+is((stat($dir))[2] & 0777, 0700, 'domain state is private');
+$status = &generate_report($d);
+is($status->{general}->{valid_requests}, 4, 'repeat generation does not double count');
+$html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+
 done_testing();
