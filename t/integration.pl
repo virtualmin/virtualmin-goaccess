@@ -153,4 +153,17 @@ chmod(0750, $slow);
 }
 unlink($slow);
 
+# A real cron wrapper must produce the same report and exit successfully.
+is(system($cron_cmd, '--domain', $d->{'id'}), 0, 'cron wrapper runs with Webmin configuration');
+my $s = &load_settings($d);
+$s->{keep_days} = 1;
+&domain_lock($d, sub { &save_settings($d, $s); });
+$status = &generate_report($d);
+is($status->{general}->{valid_requests}, 2, 'day filter uses the newest date in the log');
+$s->{keep_days} = 0;
+$s->{rotated} = 0;
+&domain_lock($d, sub { &save_settings($d, $s); });
+$status = &generate_report($d);
+is($status->{general}->{valid_requests}, 2, 'rotated logs can be excluded');
+
 done_testing();
