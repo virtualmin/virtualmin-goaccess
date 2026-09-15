@@ -50,6 +50,42 @@ return "$ip - - [$day/Sep/2026:12:00:00 +0000] \"GET $path HTTP/1.1\" ".
     ($status || 200)." 123 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0\"\n";
 }
 
+# during_update(code, label) holds the report lock in a child during a callback.
+# A completion marker proves the callback waited instead of failing on overlap.
+sub during_update
+{
+my ($code, $label) = @_;
+pipe(my $ready, my $notify) or die $!;
+my $finished = "$dir/lock-test-finished";
+my $pid = fork();
+die $! unless defined($pid);
+if (!$pid) {
+    # Use _exit so the child cannot run Webmin's inherited cleanup handlers.
+    close($ready);
+    my $ok = eval {
+        &domain_lock($d, sub {
+            syswrite($notify, "1", 1) == 1 or die $!;
+            close($notify);
+            sleep(1);
+            &write_file_contents($finished, "1\n");
+        });
+        1;
+    };
+    _exit($ok ? 0 : 1);
+}
+close($notify);
+read($ready, my $signal, 1) == 1 or die "Lock fixture failed\n";
+close($ready);
+my $result = eval { $code->() };
+my $err = $@;
+ok(-f $finished, "$label waits for the current update");
+waitpid($pid, 0);
+is($?, 0, "$label lock fixture completed");
+unlink($finished);
+die $err if $err;
+return $result;
+}
+
 # A dangling log symlink must remain untouched. A missing log must be created
 # with Virtualmin's ownership and permissions. Remove old fixture rotations
 # so they do not affect request counts.
@@ -99,5 +135,22 @@ is((stat($dir))[2] & 0777, 0700, 'domain state is private');
 $status = &generate_report($d);
 is($status->{general}->{valid_requests}, 4, 'repeat generation does not double count');
 $html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+
+# Lock contention and a stalled parser leave the published snapshot untouched.
+&domain_lock($d, sub {
+    eval { &generate_report($d); };
+    like($@, qr/being updated/, 'concurrent updates fail clearly');
+});
+my $slow = "$d->{home}/goaccess-slow-test";
+write_log($slow, "#!/bin/sh\nexec /bin/sleep 30\n");
+chmod(0750, $slow);
+{
+    local $config{goaccess} = $slow;
+    local $config{timeout} = 1;
+    eval { &generate_report($d); };
+    like($@, qr/timed out/, 'stalled parser is terminated');
+    is(sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024)), sha256_hex($html), 'timeout preserves prior HTML');
+}
+unlink($slow);
 
 done_testing();
