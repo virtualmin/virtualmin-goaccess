@@ -166,4 +166,15 @@ $s->{rotated} = 0;
 $status = &generate_report($d);
 is($status->{general}->{valid_requests}, 2, 'rotated logs can be excluded');
 
+# Failed parsing keeps the last successful HTML and records the error.
+$html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+write_log($log, "This is not an access log\n");
+eval { &generate_report($d); };
+like($@, qr/GoAccess|format|parsed/i, 'parser failure reaches the caller');
+is(sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024)), sha256_hex($html), 'failed update preserves prior HTML');
+ok(&report_status($d)->{error}, 'failed attempt recorded');
+write_log($log, entry('21', '192.0.2.10', '/recovered'));
+$status = &generate_report($d);
+ok(!$status->{error}, 'successful retry clears prior error');
+
 done_testing();
