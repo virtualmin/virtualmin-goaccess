@@ -177,4 +177,14 @@ write_log($log, entry('21', '192.0.2.10', '/recovered'));
 $status = &generate_report($d);
 ok(!$status->{error}, 'successful retry clears prior error');
 
+# Common and custom format configuration is exercised with the real parser.
+write_log($log, "192.0.2.10 - - [21/Sep/2026:12:00:00 +0000] \"GET /common HTTP/1.1\" 200 50\n");
+$s->{format} = 'COMMON';
+&domain_lock($d, sub { &save_settings($d, $s); });
+is(&generate_report($d)->{general}->{valid_requests}, 1, 'common log format supported');
+$s->{format} = 'CUSTOM';
+$s->{custom_format} = '%h %^[%d:%t %^] "%r" %s %b';
+&domain_lock($d, sub { &save_settings($d, $s); });
+is(&generate_report($d)->{general}->{valid_requests}, 1, 'custom log format supported');
+
 done_testing();
