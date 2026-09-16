@@ -239,4 +239,28 @@ like($@, qr/paused/i, 'suspended reports cannot be generated');
 ok(&feature_enable($d), 'domain re-enabled');
 is(scalar(&find_cron_jobs($d)), 1, 'saved schedule restored');
 
+# Portable backups include the rendered HTML as well as validated settings.
+my $backup = "$d->{home}/goaccess-test-backup.json";
+ok(during_update(sub { &feature_backup($d, $backup, {}, {}) }, 'Backup'), 'Virtualmin backup hook succeeds');
+# A delayed write failure must reach Virtualmin after the writer is reaped.
+{
+    no warnings 'redefine';
+    my $close = \&virtual_server::close_tempfile_as_domain_user;
+    local *virtual_server::close_tempfile_as_domain_user = sub {
+        $close->(@_);
+        return 0;
+    };
+    ok(!&feature_backup($d, $backup, {}, {}), 'backup reports a failed final write');
+}
+my $before = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+$s->{max_items} = 50;
+$s->{schedule} = 'manual';
+&state_lock($d, sub { &save_settings($d, $s); &sync_cron($d, $s); });
+is(scalar(&find_cron_jobs($d)), 0, 'manual schedule removes cron');
+unlink("$dir/report.html");
+ok(&feature_restore($d, $backup, {}, {}), 'Virtualmin restore hook succeeds');
+is(&load_settings($d)->{max_items}, 100, 'backed-up settings restored');
+is(sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024)), sha256_hex($before), 'HTML snapshot restored');
+unlink($backup);
+
 done_testing();
