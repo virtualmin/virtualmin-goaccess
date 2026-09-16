@@ -225,4 +225,18 @@ is(&generate_report($d)->{general}->{valid_requests}, 1, 'custom log format supp
               'ACL editor saves action permissions and retains the owner restriction');
 }
 
+# Schedule changes and suspension must never leave duplicate jobs behind.
+$s->{schedule} = 'daily';
+&state_lock($d, sub { &save_settings($d, $s); &sync_cron($d, $s); });
+&state_lock($d, sub { &sync_cron($d, $s); });
+my @jobs = &find_cron_jobs($d);
+is(scalar(@jobs), 1, 'schedule updates are idempotent');
+is($jobs[0]->{hours}, $d->{'id'} % 24, 'daily job uses one stable hour');
+ok(during_update(sub { &feature_disable($d) }, 'Suspension'), 'domain suspension handled');
+is(scalar(&find_cron_jobs($d)), 0, 'suspended domain has no cron job');
+eval { &generate_report($d); };
+like($@, qr/paused/i, 'suspended reports cannot be generated');
+ok(&feature_enable($d), 'domain re-enabled');
+is(scalar(&find_cron_jobs($d)), 1, 'saved schedule restored');
+
 done_testing();
