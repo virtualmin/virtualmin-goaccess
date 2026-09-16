@@ -187,4 +187,42 @@ $s->{custom_format} = '%h %^[%d:%t %^] "%r" %s %b';
 &domain_lock($d, sub { &save_settings($d, $s); });
 is(&generate_report($d)->{general}->{valid_requests}, 1, 'custom log format supported');
 
+# Virtualmin supplies domain scope; module ACLs only restrict report actions.
+{
+    local %access = (generate => 1, configure => 0);
+    local %virtual_server::access = (domains => $d->{'id'}, noconfig => 1);
+    ok(&allowed_domain($d->{'id'}), 'domain owner can read own report');
+    ok(&allowed_domain($d->{'id'}, 'generate'), 'generation permission honored');
+    ok(!&allowed_domain($d->{'id'}, 'configure'), 'report configuration denied without permission');
+    {
+        local $access{generate} = 0;
+        ok(!&allowed_domain($d->{'id'}, 'generate'), 'report generation denied without permission');
+        ok(&allowed_domain($d->{'id'}), 'generation restriction retains report viewing');
+    }
+    {
+        local $access{configure} = 1;
+        local $access{noconfig} = 1;
+        local $config{noedit} = 1;
+        ok(!&allowed_domain($d->{'id'}, 'configure'), 'administrator owner restriction applies immediately');
+        ok(&allowed_domain($d->{'id'}), 'owner restriction retains report viewing');
+    }
+    local $virtual_server::access{domains} = '';
+    ok(!&allowed_domain($d->{'id'}), 'Virtualmin domain restriction enforced');
+    ok(!&allowed_domain($d->{'id'}, 'generate'), 'action permission cannot bypass Virtualmin domain scope');
+}
+
+# Owner ACLs inherit domain scope and retain separate action permissions.
+{
+    local $config{noedit} = 0;
+    my ($grant) = &feature_webmin($d, [$d]);
+    is_deeply($grant, [$module_name, {noconfig => 1, configure => 1, generate => 1}],
+              'owner ACL grants report actions without duplicating domain scope');
+    ok(!&feature_webmin($d, []), 'no module access without a reporting domain');
+    require './acl_security.pl';
+    my %acl = (noconfig => 1, configure => 0, generate => 1);
+    &acl_security_save(\%acl, {configure => 1, generate => 0});
+    is_deeply(\%acl, {noconfig => 1, configure => 1, generate => 0},
+              'ACL editor saves action permissions and retains the owner restriction');
+}
+
 done_testing();
