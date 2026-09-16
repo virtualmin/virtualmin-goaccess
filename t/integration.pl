@@ -263,4 +263,41 @@ is(&load_settings($d)->{max_items}, 100, 'backed-up settings restored');
 is(sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024)), sha256_hex($before), 'HTML snapshot restored');
 unlink($backup);
 
+# Domain names can change while their stable ID retains settings and schedules.
+my %renamed = (%$d, dom => 'renamed.example.test');
+ok(&feature_modify(\%renamed, $d), 'domain rename callback succeeds');
+is(&domain_dir(\%renamed), $dir, 'rename preserves the storage directory');
+is(scalar(&find_cron_jobs(\%renamed)), 1, 'rename preserves one scheduled update');
+ok(!-e "$dir/report.html", 'stale report title removed on rename');
+
+# Preserve Virtualmin's outer lifecycle lock, including on callback failures.
+&virtual_server::lock_domain($d);
+my $domain_lockfile = "$virtual_server::domains_dir/$d->{'id'}.lock";
+&state_lock($d, sub { &sync_cron($d, &load_settings($d)); });
+ok(-f $domain_lockfile, 'cron changes retain the caller domain lock');
+eval { &state_lock($d, sub { die "callback failed\n"; }); };
+like($@, qr/callback failed/, 'state callback errors reach the caller');
+ok(-f $domain_lockfile, 'failed state callback retains the caller domain lock');
+&virtual_server::unlock_domain($d);
+eval { &state_lock($d, sub { die "callback failed\n"; }); };
+ok(!-f $domain_lockfile, 'failed state callback releases its own domain lock');
+
+# Broken report settings must not prevent suspension or feature removal.
+&write_file_contents("$dir/settings.json", 'broken settings');
+ok(&feature_disable($d), 'suspension tolerates damaged report settings');
+is(scalar(&find_cron_jobs($d)), 0, 'damaged settings do not leave scheduled updates');
+ok(&feature_delete($d), 'feature removal tolerates damaged report settings');
+ok(!-d $dir, 'feature removal clears private state');
+ok(-f $log, 'feature removal preserves website logs');
+ok(&feature_disable($d), 'suspension tolerates missing report state');
+ok(-f "$dir/paused", 'missing state is recreated as paused');
+ok(&feature_delete($d), 'temporary paused state can be removed');
+ok(&feature_setup($d), 'feature can be enabled again after removal');
+
+# Finish with a combined-format dashboard for the HTTP and browser checks.
+my $original = GoAccess::Report::defaults();
+&state_lock($d, sub { &save_settings($d, $original); &sync_cron($d, $original); });
+write_log($log, entry('21', '192.0.2.10', '/index.html'));
+&generate_report($d);
+print "Fixture report: /virtualmin-goaccess/view.cgi?dom=$d->{id}\n";
 done_testing();
