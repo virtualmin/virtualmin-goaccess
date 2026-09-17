@@ -194,6 +194,12 @@ my ($id, $permission) = @_;
 return &allowed_domain($id, $permission) || &error($text{'error_access'});
 }
 
+# require_post() requires POST for actions that change report state.
+sub require_post
+{
+($ENV{'REQUEST_METHOD'} || '') eq 'POST' || &error($text{'error_post'});
+}
+
 # check_goaccess() reports an unavailable binary or invalid administrator limits.
 sub check_goaccess
 {
@@ -297,6 +303,17 @@ return &domain_lock($d, sub {
     die $err if $err;
     return $status;
 });
+}
+
+# settings_input(input) extracts only fields supported by the report engine.
+sub settings_input
+{
+my ($in) = @_;
+my $s = GoAccess::Report::defaults();
+foreach my $key (keys %$s) {
+    $s->{$key} = $in->{$key} if exists($in->{$key});
+}
+return GoAccess::Report::validate($s);
 }
 
 1;
