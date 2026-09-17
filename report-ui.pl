@@ -11,4 +11,16 @@ my ($d, $settings) = @_;
 return &text('format_'.lc($settings->{'format'}), &web_server_name($d));
 }
 
+# report_generate_form(domain, [first]) returns a POST form to update the report.
+# Set first for the initial report button, which has no icon.
+sub report_generate_form
+{
+my ($d, $first) = @_;
+return &ui_form_start('generate.cgi', 'post').&ui_hidden('dom', $d->{'id'}).
+       &ui_button_icon(&html_escape($text{$first ? 'generate_first' : 'generate'}),
+                       $first ? undef : 'refresh',
+                       { 'type' => 'submit', 'class' => 'primary' }).
+       &ui_form_end();
+}
+
 1;
