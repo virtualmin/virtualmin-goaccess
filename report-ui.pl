@@ -23,4 +23,12 @@ return &ui_form_start('generate.cgi', 'post').&ui_hidden('dom', $d->{'id'}).
        &ui_form_end();
 }
 
+# report_settings_link(domain, [icon]) links to the settings page as a button.
+sub report_settings_link
+{
+my ($d, $icon) = @_;
+return &ui_link_icon('edit.cgi?dom='.$d->{'id'},
+                     &html_escape($text{'report_settings'}), $icon);
+}
+
 1;

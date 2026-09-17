@@ -164,6 +164,19 @@ sub feature_modules
 return ([$module_name, $text{'index_title'}, undef, 'config_avail', $module_name]);
 }
 
+# feature_links(domain) adds report and configuration links to the domain menu.
+sub feature_links
+{
+my ($d) = @_;
+my @links = ({mod => $module_name, desc => $text{'links_report'}, cat => 'logs',
+              page => 'view.cgi?dom='.$d->{'id'}});
+# Show the settings link only to users with configuration permission.
+push(@links, {mod => $module_name, desc => $text{'links_config'}, cat => 'logs',
+              page => 'edit.cgi?dom='.$d->{'id'}})
+    if &allowed_domain($d->{'id'}, 'configure');
+return @links;
+}
+
 # feature_backup_name() describes the contents in Virtualmin backup options.
 sub feature_backup_name { return $text{'feat_backup_name'}; }
 
