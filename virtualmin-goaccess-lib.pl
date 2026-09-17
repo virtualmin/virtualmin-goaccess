@@ -16,6 +16,14 @@ require "$module_root_directory/GoAccess/Report.pm";
 %access = &get_module_acl();
 our $cron_cmd = "$module_config_directory/goaccess.pl";
 
+# web_server_name(domain) names the web server whose logs the domain uses.
+sub web_server_name
+{
+my ($d) = @_;
+my $web = &virtual_server::domain_has_website($d) || '';
+return $web eq 'web' ? 'Apache' : $web =~ /nginx/i ? 'Nginx' : $text{'web_server'};
+}
+
 # create_website_log(domain, path) creates an empty log if the path is missing.
 # Use the domain owner within its home directory and root elsewhere, then
 # apply the web server's log permissions. Leave existing files and symlinks
