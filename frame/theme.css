@@ -20,3 +20,39 @@ html {
 	--ga-line-strong: color-mix(in srgb, var(--ga-fg) 40%, transparent);
 	--ga-radius: 4px;
 }
+
+/* Use the parent page's colors and fonts when available. */
+html, body {
+	background: var(--ga-bg);
+	color: var(--ga-fg);
+}
+body { font-family: var(--ui-font, "Helvetica Neue", Helvetica, Arial, sans-serif); }
+code, kbd, pre, samp {
+	font-family: var(--ui-font-mono, Menlo, Monaco, Consolas, "Courier New", monospace);
+}
+h1, hgroup h2, :is(article, div.wrap-panel) h2 { color: var(--ga-fg); }
+h1, h3, hgroup h2, :is(article, div.wrap-panel) h2 { letter-spacing: 0; }
+/* Hide the duplicate title and update time; the parent page shows them.
+ * Report menu buttons remain available separately. */
+#last-updated, .page-header h4:has(.last-updated) { display: none !important; }
+.page-header h1 > .hidden-xs, .report-title { display: none; }
+.page-header { display: none; }
+a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent); }
+.text-muted, hgroup small, .wrap-panel .gheader small, .spinner, .app-loading-status,
+.powered, .powered a, :is(article, div.wrap-panel) table .percent { color: var(--ga-muted); }
+.app-loading-status { text-shadow: none; }
+.powered span, .dropdown-header { color: var(--ga-accent); }
+#last-updated.label {
+	background: var(--ui-info-soft, #d9edf7);
+	color: var(--ui-info-text, #31708f);
+	border: 1px solid var(--ui-info-line, transparent);
+	border-radius: var(--ga-radius);
+	font-weight: 600;
+}
+.report-title {
+	background: var(--ga-panel);
+	color: var(--ga-muted);
+	border: 1px solid var(--ga-border);
+	border-radius: var(--ga-radius);
+	box-shadow: none;
+}
