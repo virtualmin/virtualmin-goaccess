@@ -93,6 +93,21 @@ foreach my $file (@$files) {
 return $bytes;
 }
 
+# module_file(name) reads one of the module's own presentation files.
+sub module_file
+{
+my ($name) = @_;
+return &read_file_contents("$module_root_directory/$name");
+}
+
+# frame_assets() returns inline CSS and JavaScript for the report theme.
+# The frame's Content Security Policy blocks external resources.
+sub frame_assets
+{
+return &ui_tag('style', &module_file('frame/theme.css')).
+       &ui_tag('script', &module_file('frame/theme.js'));
+}
+
 # state_root() returns the private directory for reports, settings and locks.
 sub state_root
 {

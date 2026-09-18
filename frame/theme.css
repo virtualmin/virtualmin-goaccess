@@ -1,0 +1,22 @@
+/*
+ * Apply the parent Webmin page's palette to GoAccess's bright theme.
+ * theme.js sets the --ui-* properties received from report.js on the root
+ * element. Light-theme defaults apply when no palette is available.
+ */
+html {
+	--ga-bg: var(--ui-surface, #ffffff);
+	--ga-panel: var(--ui-surface, #ffffff);
+	--ga-panel-2: var(--ui-surface-2, #f8fafc);
+	--ga-border: var(--ui-border, #e2e8f0);
+	--ga-border-soft: var(--ui-border-soft, #f1f5f9);
+	--ga-fg: var(--ui-fg, #1e293b);
+	--ga-muted: var(--ui-fg-muted, #64748b);
+	--ga-accent: var(--ui-accent, #3b82f6);
+	--ga-accent-soft: var(--ui-accent-soft, rgba(59, 130, 246, 0.08));
+	--ga-hits: var(--ui-accent, #447fb3);
+	--ga-visitors: var(--ui-danger, #ff6854);
+	/* Derive chart lines from the text color to suit either palette. */
+	--ga-line: color-mix(in srgb, var(--ga-fg) 22%, transparent);
+	--ga-line-strong: color-mix(in srgb, var(--ga-fg) 40%, transparent);
+	--ga-radius: 4px;
+}
