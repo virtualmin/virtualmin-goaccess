@@ -56,3 +56,29 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 	border-radius: var(--ga-radius);
 	box-shadow: none;
 }
+
+/* Overall statistics tiles, with the theme's state colors as their accents */
+#overall li div, .wrap-general .grid-module {
+	background: var(--ga-panel);
+	color: var(--ga-fg);
+	border: 1px solid var(--ga-border);
+	border-radius: var(--ga-radius);
+	box-shadow: none;
+}
+#overall li span:first-of-type, .wrap-general .col-title {
+	color: var(--ga-muted);
+	text-shadow: none;
+}
+#overall li.black div::before { background: var(--ga-fg); }
+#overall li.gray div::before { background: var(--ui-neutral-line, #cbd5e1); }
+#overall li.red div::before { background: var(--ui-danger, #ff303e); }
+#overall li.blue div::before { background: var(--ui-info, #3b82f6); }
+#overall li.green div::before { background: var(--ui-success, #229f75); }
+
+/* GoAccess 1.7 uses grid modules and div.wrap-panel instead of the newer
+ * #overall tiles and article panels. Keep both markup versions themed. */
+.wrap-general .grid-module.black { border-top: 4px solid var(--ga-fg); }
+.wrap-general .grid-module.gray { border-top: 4px solid var(--ui-neutral-line, #cbd5e1); }
+.wrap-general .grid-module.red { border-top: 4px solid var(--ui-danger, #ff303e); }
+.wrap-general .grid-module.blue { border-top: 4px solid var(--ui-info, #3b82f6); }
+.wrap-general .grid-module.green { border-top: 4px solid var(--ui-success, #229f75); }
