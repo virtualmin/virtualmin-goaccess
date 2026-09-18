@@ -82,3 +82,25 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 .wrap-general .grid-module.red { border-top: 4px solid var(--ui-danger, #ff303e); }
 .wrap-general .grid-module.blue { border-top: 4px solid var(--ui-info, #3b82f6); }
 .wrap-general .grid-module.green { border-top: 4px solid var(--ui-success, #229f75); }
+
+/* Panels */
+:is(article, div.wrap-panel) > div {
+	background: var(--ga-panel);
+	border: 1px solid var(--ga-border);
+	border-radius: var(--ga-radius);
+	box-shadow: none;
+}
+
+/* Tables */
+.table > thead > tr > th, .table > tbody > tr > td, .table > tbody > tr > th,
+.table > tfoot > tr > td, .table > tfoot > tr > th,
+.table-responsive { border-color: var(--ga-border); }
+:is(article, div.wrap-panel) table .thead-min, :is(article, div.wrap-panel) table .thead-avg, :is(article, div.wrap-panel) table .thead-max {
+	background: var(--ga-panel-2);
+}
+:is(article, div.wrap-panel) table .thead-avg { border-bottom: 2px solid var(--ga-line); }
+:is(article, div.wrap-panel) table > thead > tr.thead-cols { border-bottom: 2px solid var(--ga-border); }
+:is(article, div.wrap-panel) table tfoot > tr > th { border-top: 1px dotted var(--ga-line); }
+:is(article, div.wrap-panel) table tbody.tbody-data tr td { border-right: 1px solid var(--ga-border-soft); }
+:is(article, div.wrap-panel) table tbody.tbody-data tr.shaded { background-color: var(--ga-panel-2); }
+:is(article, div.wrap-panel) table.table-hover > tbody > tr:hover { background-color: var(--ga-accent-soft); }
