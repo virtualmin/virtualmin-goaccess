@@ -31,4 +31,18 @@ return &ui_link_icon('edit.cgi?dom='.$d->{'id'},
                      &html_escape($text{'report_settings'}), $icon);
 }
 
+# report_error(intro, error, type, [attempted]) shows an error with expandable
+# details and, when supplied, the failed attempt's timestamp.
+sub report_error
+{
+my ($intro, $err, $type, $attempted) = @_;
+# The date formatter returns trusted theme markup for a validated timestamp.
+my $when = ($attempted || '') =~ /\A\d+\z/ ?
+    ' '.&text('report_attempted', &make_date($attempted)) : '';
+return &ui_alert(&html_escape($intro).$when.' '.
+    &ui_details({ 'title' => $text{'error_details'}, 'html' => 1,
+                  'content' => &ui_tag('pre', &html_escape($err),
+                                       { 'class' => 'ui_code_block' }) }), $type);
+}
+
 1;
