@@ -224,3 +224,72 @@ h3 .fa, .dropdown-header .fa { margin-right: 4px; }
 	border-left: 4px solid transparent;
 }
 .btn-sm.dropdown-toggle { padding-right: 10px; }
+
+/* Replace the left navigation strip with top-right buttons and a menu
+ * that slides in from the right. */
+nav {
+	background: var(--ga-panel-2);
+	max-width: 100%;
+	left: auto;
+	right: -100%;
+	border-left: 1px solid var(--ga-border);
+	border-right: 0;
+	transition: right .2s;
+}
+/* Keep navigation available at every width. Hide the duplicate mobile
+ * button and the attribution link, which the sandbox blocks from opening. */
+nav.hidden-xs, nav.hidden-sm { display: block !important; }
+.nav-minibars, nav .powered { display: none !important; }
+html:not(.dark) nav { box-shadow: none; }
+nav.active {
+	left: auto;
+	right: 0;
+	opacity: 1;
+	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.12);
+}
+.container-fluid { margin-left: auto; }
+/* Compact menu and settings buttons pinned to the top right corner */
+nav .nav-bars, nav .nav-gears, nav .nav-ws-status {
+	position: fixed;
+	left: auto;
+}
+nav .nav-bars, nav .nav-gears {
+	top: 8px;
+	right: 8px;
+	width: 29px;
+	height: 29px;
+	padding: 0;
+	font-size: 16px;
+	line-height: 1;
+	border: 1px solid var(--ga-border);
+	border-radius: var(--ga-radius);
+	background: var(--ga-panel-2);
+	transition: opacity .2s;
+}
+nav .nav-gears { top: 8px; right: 43px; }
+nav .nav-ws-status { top: 16px; right: 82px; }
+/* Leave room beside the first heading's date range for the two menu buttons. */
+#overall, .wrap-general { margin-top: 10px; }
+#overall hgroup p, .wrap-general > .gheader .pull-right { padding-right: 75px; }
+nav .nav-bars, nav .nav-gears { color: var(--ga-muted); }
+nav .nav-bars:hover, nav .nav-gears:hover, nav header a:hover { color: var(--ga-fg); }
+nav header a { color: var(--ga-fg); }
+nav h3 { color: var(--ga-fg) !important; }
+nav li a { color: var(--ga-muted); }
+nav li:hover a, nav li.active a {
+	border-color: var(--ga-accent);
+	color: var(--ga-accent);
+}
+nav li .toggle-panel i { color: var(--ga-muted); }
+nav li .toggle-panel.active i { color: var(--ga-accent); }
+.nav-list li .drag-handle { color: var(--ga-muted); }
+.nav-list li .drag-handle:hover { color: var(--ga-fg); }
+.nav-list li.drag-over {
+	border-top-color: var(--ui-success, #4caf50);
+	background-color: var(--ui-success-soft, rgba(76, 175, 80, 0.1));
+}
+.clickable:hover, .expandable > td:hover, nav li:hover { background: var(--ga-accent-soft); }
+
+/* The report follows the Webmin theme, so GoAccess's own theme choice is hidden */
+nav .nav-list h3:has(+ ul li a[class^="theme-"]),
+nav .nav-list ul:has(> li > a[class^="theme-"]) { display: none !important; }
