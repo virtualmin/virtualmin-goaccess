@@ -154,3 +154,51 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 :is(article, div.wrap-panel) table .cell-hl.d3 { background: color-mix(in srgb, var(--ga-fg) 34%, transparent); }
 :is(article, div.wrap-panel) table .cell-hl.d4 { background: color-mix(in srgb, var(--ga-fg) 48%, transparent); }
 .progress-bar { background: var(--ga-accent); }
+
+/* Buttons, pagination and menus */
+.btn-default {
+	color: var(--ga-fg);
+	background-color: var(--ga-panel-2);
+	border-color: var(--ga-border);
+	border-radius: var(--ga-radius);
+}
+.btn-default:hover, .btn-default:focus, .btn-default:active, .btn-default.active,
+.btn-default:active:hover, .btn-default:active:focus, .btn-default.active:hover,
+.open > .dropdown-toggle.btn-default, .open > .dropdown-toggle.btn-default:hover,
+.open > .dropdown-toggle.btn-default:focus {
+	color: var(--ga-accent);
+	background-color: var(--ga-accent-soft);
+	border-color: var(--ga-accent);
+	/* GoAccess nudges hovered buttons up by a pixel; keep them still */
+	transform: none;
+}
+.pagination > li > a {
+	background-color: var(--ga-panel);
+	border-color: var(--ga-border);
+	color: var(--ga-muted);
+	border-radius: var(--ga-radius);
+}
+.pagination > li > a:hover, .pagination > li > a:active, .pagination > li > a:focus {
+	color: var(--ga-accent);
+	background-color: var(--ga-panel-2);
+	border-color: var(--ga-accent);
+}
+.pagination > .disabled > a, .pagination > .disabled > a:hover,
+.pagination > .disabled > a:focus {
+	color: var(--ga-muted);
+	background-color: var(--ga-panel);
+	border-color: var(--ga-border);
+	opacity: 0.5;
+}
+.dropdown-menu {
+	background-color: var(--ga-panel);
+	border: 1px solid var(--ga-border);
+	border-radius: var(--ga-radius);
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+.dropdown-menu > li > a { color: var(--ga-fg); }
+.dropdown-menu > li > a:hover, .dropdown-menu > li > a:focus {
+	color: var(--ga-fg);
+	background-color: var(--ga-panel-2);
+}
+.dropdown-menu .divider { background-color: var(--ga-border); }
