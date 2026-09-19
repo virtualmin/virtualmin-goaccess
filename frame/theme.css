@@ -202,3 +202,25 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 	background-color: var(--ga-panel-2);
 }
 .dropdown-menu .divider { background-color: var(--ga-border); }
+
+/* Align icons with adjacent text and add spacing. Keep standalone controls
+ * at their original alignment. */
+.fa { margin-right: 2px; vertical-align: -14%; }
+h3 .fa, .dropdown-header .fa { margin-right: 4px; }
+/* Small button icons need less vertical offset than heading icons. */
+.btn .fa { vertical-align: -6%; }
+.pagination .fa, .row-expandable .fa, nav .nav-bars .fa, nav .nav-gears .fa,
+.nav-minibars, .nav-ws-status, .spinner { margin-right: 0; vertical-align: baseline; }
+/* Draw dropdown carets in CSS for consistent size and alignment. */
+.dropdown-toggle .fa-caret-down { margin: 0 0 0 3px; vertical-align: baseline; }
+.dropdown-toggle .fa-caret-down::before {
+	content: "";
+	display: inline-block;
+	width: 0;
+	height: 0;
+	vertical-align: middle;
+	border-top: 4px solid currentColor;
+	border-right: 4px solid transparent;
+	border-left: 4px solid transparent;
+}
+.btn-sm.dropdown-toggle { padding-right: 10px; }
