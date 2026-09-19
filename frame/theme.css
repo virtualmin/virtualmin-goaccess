@@ -293,3 +293,54 @@ nav li .toggle-panel.active i { color: var(--ga-accent); }
 /* The report follows the Webmin theme, so GoAccess's own theme choice is hidden */
 nav .nav-list h3:has(+ ul li a[class^="theme-"]),
 nav .nav-list ul:has(> li > a[class^="theme-"]) { display: none !important; }
+
+/* Charts */
+.axis path { stroke: var(--ga-line-strong); }
+.grid.y .tick line, .grid.x .tick line { stroke: var(--ga-line); }
+.axis.x .tick line, .axis.y0 .tick line, .axis.y1 .tick line,
+.grid.y .tick:first-child line { stroke: var(--ga-line-strong); }
+.axis text, .axis-label, text.legend {
+	fill: var(--ga-muted);
+	font-family: var(--ui-font, sans-serif);
+}
+line.indicator { stroke: var(--ga-line-strong); }
+.area0, .bars.y0 .bar, .points.y0, rect.legend.y0 { fill: var(--ga-hits); }
+.area1, .bars.y1 .bar, .points.y1, rect.legend.y1 { fill: var(--ga-visitors); }
+.line0 { stroke: var(--ga-hits); }
+.line1 { stroke: var(--ga-visitors); }
+.chart-tooltip {
+	background-color: var(--ga-panel);
+	border-color: var(--ga-border);
+	color: var(--ga-fg);
+	border-radius: var(--ga-radius);
+}
+.chart-tooltip tr { border-color: var(--ga-border); }
+.chart-tooltip th {
+	background-color: var(--ga-panel-2);
+	color: var(--ga-fg);
+}
+.chart-tooltip td { border-left-color: var(--ga-border); }
+.chart-tooltip .blue { background-color: var(--ga-hits); }
+.chart-tooltip .red { background-color: var(--ga-visitors); }
+
+/* Maps */
+.chart-wrap.map-fullscreen { background: var(--ga-bg); }
+.country {
+	fill: var(--ui-neutral-soft, #cccccc);
+	stroke: var(--ga-panel);
+}
+.country:hover { fill: var(--ga-accent-soft); }
+.graticule { stroke: var(--ga-line); }
+.legend-svg text { fill: var(--ga-fg); }
+
+/* Scrollbars */
+::-webkit-scrollbar-track, .table-responsive::-webkit-scrollbar-track,
+::-webkit-scrollbar, .table-responsive::-webkit-scrollbar {
+	background-color: var(--ga-panel-2);
+}
+::-webkit-scrollbar-thumb, .table-responsive::-webkit-scrollbar-thumb {
+	background-color: var(--ga-line);
+}
+::-webkit-scrollbar-thumb:hover, .table-responsive::-webkit-scrollbar-thumb:hover {
+	background-color: var(--ga-line-strong);
+}
