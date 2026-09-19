@@ -104,3 +104,53 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 :is(article, div.wrap-panel) table tbody.tbody-data tr td { border-right: 1px solid var(--ga-border-soft); }
 :is(article, div.wrap-panel) table tbody.tbody-data tr.shaded { background-color: var(--ga-panel-2); }
 :is(article, div.wrap-panel) table.table-hover > tbody > tr:hover { background-color: var(--ga-accent-soft); }
+
+/* Highlighted values: status codes, countries, methods and protocols */
+:is(article, div.wrap-panel) table .span-hl.lgrn {
+	background: var(--ui-success-soft, #e6f4ea);
+	color: var(--ui-success-text, #137333);
+}
+:is(article, div.wrap-panel) table .span-hl.lyel {
+	background: var(--ui-warning-soft, #fff3cd);
+	color: var(--ui-warning-text, #d38a10);
+}
+:is(article, div.wrap-panel) table .span-hl.lred {
+	background: var(--ui-danger-soft, #fce8e6);
+	color: var(--ui-danger-text, #c5221f);
+}
+:is(article, div.wrap-panel) table .span-hl.lblu {
+	background: var(--ui-info-soft, #cfe2ff);
+	color: var(--ui-info-text, #052c65);
+}
+:is(article, div.wrap-panel) table .span-hl.lprp {
+	background: var(--ga-accent-soft);
+	color: var(--ga-accent);
+}
+:is(article, div.wrap-panel) table .span-hl.lgry {
+	background: var(--ui-neutral-soft, #898989);
+	color: var(--ui-neutral-text, #ffffff);
+}
+:is(article, div.wrap-panel) table .span-hl.g5 {
+	background: var(--ui-neutral-soft, #e9ecef);
+	color: var(--ga-fg);
+}
+:is(article, div.wrap-panel) table .cell-hl.b1 {
+	background: var(--ga-accent);
+	color: var(--ga-bg);
+}
+:is(article, div.wrap-panel) table .cell-hl.b2 {
+	background: color-mix(in srgb, var(--ga-accent) 60%, var(--ga-panel));
+	color: var(--ga-fg);
+}
+:is(article, div.wrap-panel) table .cell-hl.b3 {
+	background: color-mix(in srgb, var(--ga-accent) 35%, var(--ga-panel));
+	color: var(--ga-fg);
+}
+/* Protocol versions: tints of the text color, readable on both palettes */
+:is(article, div.wrap-panel) table .cell-hl.d1, :is(article, div.wrap-panel) table .cell-hl.d2,
+:is(article, div.wrap-panel) table .cell-hl.d3, :is(article, div.wrap-panel) table .cell-hl.d4 { color: var(--ga-fg); }
+:is(article, div.wrap-panel) table .cell-hl.d1 { background: color-mix(in srgb, var(--ga-fg) 12%, transparent); }
+:is(article, div.wrap-panel) table .cell-hl.d2 { background: color-mix(in srgb, var(--ga-fg) 22%, transparent); }
+:is(article, div.wrap-panel) table .cell-hl.d3 { background: color-mix(in srgb, var(--ga-fg) 34%, transparent); }
+:is(article, div.wrap-panel) table .cell-hl.d4 { background: color-mix(in srgb, var(--ga-fg) 48%, transparent); }
+.progress-bar { background: var(--ga-accent); }
