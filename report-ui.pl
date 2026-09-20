@@ -31,6 +31,29 @@ return &ui_link_icon('edit.cgi?dom='.$d->{'id'},
                      &html_escape($text{'report_settings'}), $icon);
 }
 
+# report_frame(domain) embeds the sandboxed report with a loading spinner
+# and the script that sends the page's palette and fonts.
+sub report_frame
+{
+my ($d) = @_;
+my $src = 'report.cgi?dom='.$d->{'id'};
+# Opaque frame origin prevents report scripts from reaching Webmin's session.
+my %attrs = ( 'title' => $text{'report_frame'},
+              'sandbox' => 'allow-scripts allow-downloads',
+              'referrerpolicy' => 'same-origin',
+              'style' => 'display:block;width:100%;height:85vh;min-height:640px;border:0' );
+# report.js passes the available palette in the URL fragment and resends it
+# after stylesheet loads or theme changes. It also hides the loading spinner.
+# It is inlined because Ajax navigation runs inline scripts on every visit.
+return &ui_tag_start('div', { 'class' => 'goaccess-frame-box' }).
+       &ui_tag('div', &ui_progress(0, { 'ring' => 1, 'indeterminate' => 1, 'size' => 40 }),
+               { 'class' => 'goaccess-frame-loading', 'aria-label' => $text{'report_loading'} }).
+       &ui_tag('iframe', '', { %attrs, 'id' => 'goaccess-frame', 'data-src' => $src }).
+       &ui_tag('noscript', &ui_tag('iframe', '', { %attrs, 'src' => $src })).
+       &ui_tag_end('div').
+       &ui_tag('script', &module_file('report.js'));
+}
+
 # report_error(intro, error, type, [attempted]) shows an error with expandable
 # details and, when supplied, the failed attempt's timestamp.
 sub report_error
