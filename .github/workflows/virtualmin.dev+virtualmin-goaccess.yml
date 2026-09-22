@@ -3,7 +3,7 @@ name: Package and upload artifacts
 on:
   push:
     branches:
-      - master
+      - main
   release:
     types:
       - prereleased
