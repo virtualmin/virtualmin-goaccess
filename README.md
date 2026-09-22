@@ -3,6 +3,13 @@
 A Virtualmin plugin that builds interactive [GoAccess](https://goaccess.io/)
 reports for Apache and Nginx websites.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
+    <img src="docs/images/hero-light.png" width="900" alt="GoAccess report for domain.tld in Virtualmin, showing traffic totals and charts for visitors, requested files, static requests and missing pages.">
+  </picture>
+</p>
+
 ## Requirements
 
 - Webmin 2.670 or later with Virtualmin 8.2 or later
