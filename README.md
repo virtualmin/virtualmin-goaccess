@@ -6,7 +6,7 @@ reports for Apache and Nginx websites.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.png">
-    <img src="docs/images/hero-light.png" width="900" alt="GoAccess report for domain.tld in Virtualmin, showing traffic totals and charts for visitors, requested files, static requests and missing pages.">
+    <img src="docs/images/hero-light.png" width="900" alt="GoAccess report in Virtualmin, showing sample traffic totals and charts for visitors, requested files, static requests and missing pages.">
   </picture>
 </p>
 
