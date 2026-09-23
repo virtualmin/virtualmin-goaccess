@@ -29,8 +29,7 @@ print &ui_tag('style',
     '.goaccess .goaccess-frame-box { position: relative; } '.
     '.goaccess .goaccess-frame-loading { position: absolute; inset: 0; display: flex; '.
     'justify-content: center; align-items: flex-start; padding-top: 24px; pointer-events: none; } '.
-    '.goaccess .goaccess-frame-loading .ui_progress_ring_bar { color: var(--ui-accent); } '.
-    '.goaccess .btn .fa-cog { position: relative; top: -2px; }');
+    '.goaccess .goaccess-frame-loading .ui_progress_ring_bar { color: var(--ui-accent); }');
 
 # Preserve a usable last report and reveal technical failure details on demand.
 if ($status->{'error'}) {
