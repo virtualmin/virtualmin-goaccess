@@ -33,6 +33,7 @@ virtualmin enable-feature --domain example.com --virtualmin-goaccess
 ```sh
 prove t/report.t
 node t/report-sync.js
+node t/report-tooltips.js
 ```
 
 ## License

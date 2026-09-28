@@ -308,7 +308,10 @@ line.indicator { stroke: var(--ga-line-strong); }
 .area1, .bars.y1 .bar, .points.y1, rect.legend.y1 { fill: var(--ga-visitors); }
 .line0 { stroke: var(--ga-hits); }
 .line1 { stroke: var(--ga-visitors); }
+/* Wrap long tooltip URLs to fit narrow frames. */
+.chart-tooltip-wrap { width: max-content; max-width: calc(100vw - 16px); }
 .chart-tooltip {
+	max-width: 100%;
 	background-color: var(--ga-panel);
 	border-color: var(--ga-border);
 	color: var(--ga-fg);
@@ -318,6 +321,8 @@ line.indicator { stroke: var(--ga-line-strong); }
 .chart-tooltip th {
 	background-color: var(--ga-panel-2);
 	color: var(--ga-fg);
+	white-space: normal;
+	overflow-wrap: anywhere;
 }
 .chart-tooltip td { border-left-color: var(--ga-border); }
 .chart-tooltip .blue { background-color: var(--ga-hits); }

@@ -61,6 +61,26 @@
 		apply(event.data);
 	});
 
+	// fitTooltip(tooltip) keeps visible tooltips within the frame's side edges.
+	function fitTooltip(tooltip) {
+		if (!tooltip || !tooltip.offsetWidth) return;
+		var rect = tooltip.getBoundingClientRect();
+		var left = Math.max(8, Math.min(rect.left, root.clientWidth - rect.width - 8));
+		if (left !== rect.left) {
+			// Keep the tooltip's offset relative to its chart.
+			tooltip.style.left = (parseFloat(tooltip.style.left) || 0) + left - rect.left + 'px';
+		}
+	}
+	// Run after GoAccess positions the tooltip. Listen on the document so this
+	// also handles charts redrawn after a panel or metric change.
+	document.addEventListener('mousemove', function (event) {
+		var chart = event.target.closest && event.target.closest('.chart-wrap');
+		if (chart) fitTooltip(chart.querySelector('.chart-tooltip-wrap'));
+	});
+	window.addEventListener('resize', function () {
+		document.querySelectorAll('.chart-tooltip-wrap').forEach(fitTooltip);
+	});
+
 	// measure() sends changed content heights so the parent can resize the frame.
 	var reported = 0;
 	function measure() {
