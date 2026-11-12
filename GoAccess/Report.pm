@@ -244,6 +244,9 @@ eval {
         eval {
             # Webmin's in-process CGI runner ties standard handles to HTTP.
             # The worker must detach them before redirecting or executing tools.
+            # The runner keeps its own reference to each tied handle, so
+            # Perl's untie warning is expected and must not fill Webmin's log.
+            no warnings 'untie';
             untie(*STDIN);
             untie(*STDOUT);
             untie(*STDERR);
