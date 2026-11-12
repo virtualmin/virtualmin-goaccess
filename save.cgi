@@ -1,5 +1,6 @@
 #!/usr/bin/perl
-# Validate and save settings without allowing users to change paths or commands.
+# Validate and save settings without allowing users to change
+# paths or commands.
 use strict;
 use warnings;
 our (%text, %in);
@@ -9,13 +10,13 @@ require './virtualmin-goaccess-lib.pl';
 my $d = &require_domain($in{'dom'}, 'configure');
 # Validate first, then save the schedule and settings under one lock.
 eval {
-    my $s = &settings_input(\%in);
-    &state_lock($d, sub {
-        my ($dir) = @_;
-        &sync_cron($d, $s, -e "$dir/paused");
-        &save_settings($d, $s);
-    });
-};
+	my $s = &settings_input(\%in);
+	&state_lock($d, sub {
+		my ($dir) = @_;
+		&sync_cron($d, $s, -e "$dir/paused");
+		&save_settings($d, $s);
+		});
+	};
 # Record the action only after both changes succeed.
 &error(&html_escape($@)) if $@;
 &webmin_log('save', 'domain', $d->{'dom'}, { 'id' => $d->{'id'} });

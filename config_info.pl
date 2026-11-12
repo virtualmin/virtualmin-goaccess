@@ -28,8 +28,8 @@ my $error = &check_goaccess(undef, 1);
 # Webmin tests the literal module name for this hook before foreign_call
 # converts hyphens to underscores. Expose the name used by that test too.
 {
-    no strict 'refs';
-    *{$module_name.'::config_form'} = \&config_form;
-}
+	no strict 'refs';
+	*{$module_name.'::config_form'} = \&config_form;
+	}
 
 1;

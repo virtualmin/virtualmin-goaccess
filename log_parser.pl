@@ -1,4 +1,5 @@
-# Human-readable descriptions of this module's entries in the Webmin Actions Log.
+# Human-readable descriptions of this module's entries in the
+# Webmin Actions Log.
 use strict;
 use warnings;
 our %text;
