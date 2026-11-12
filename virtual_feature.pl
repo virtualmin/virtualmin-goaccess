@@ -2,7 +2,9 @@
 use strict;
 use warnings;
 our (%text, %config, $module_name, $module_var_directory);
-require 'virtualmin-goaccess-lib.pl';
+use WebminCore;
+&init_config();
+&foreign_require(&get_module_name());
 
 # feature_name() returns the name in Features and Plugins.
 sub feature_name { return $text{'feat_name'}; }

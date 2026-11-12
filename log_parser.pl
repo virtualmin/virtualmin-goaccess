@@ -2,7 +2,9 @@
 use strict;
 use warnings;
 our %text;
-require 'virtualmin-goaccess-lib.pl';
+use WebminCore;
+&init_config();
+&foreign_require(&get_module_name());
 
 # parse_webmin_log(user, script, action, type, object, &params) describes one
 # logged action, or returns undef for entries this module does not know.

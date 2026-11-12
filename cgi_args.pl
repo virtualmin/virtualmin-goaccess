@@ -1,7 +1,9 @@
 # Supply a permitted domain to Webmin's CGI discovery.
 use strict;
 use warnings;
-require 'virtualmin-goaccess-lib.pl';
+use WebminCore;
+&init_config();
+&foreign_require(&get_module_name());
 
 # cgi_args(cgi) returns safe example arguments for a read-only page.
 sub cgi_args

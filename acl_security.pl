@@ -2,7 +2,9 @@
 use strict;
 use warnings;
 our %text;
-require 'virtualmin-goaccess-lib.pl';
+use WebminCore;
+&init_config();
+&foreign_require(&get_module_name());
 
 # acl_security_form(acl) renders the module-specific permission fields.
 sub acl_security_form
