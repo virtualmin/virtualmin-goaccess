@@ -50,6 +50,11 @@ To enable reporting for a virtual server from the command line, run as root:
 virtualmin enable-feature --domain example.com --virtualmin-goaccess
 ```
 
+Requests that return HTTP 404 count as missing URLs and are excluded from the
+lists of requested pages and static files. A URL can appear as both missing and
+requested if some requests returned another status. An error page served with
+HTTP 200 counts as a normal request.
+
 ### GeoIP databases
 
 New installations on AlmaLinux and Rocky Linux 8 or later use

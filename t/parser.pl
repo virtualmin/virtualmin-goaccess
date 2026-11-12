@@ -70,6 +70,13 @@ is_deeply([sort @{rows($hidden, 'referring_sites')}],
 is_deeply([sort @{rows($hidden, 'referrers')}],
     ['-', 'https://example.test.evil.test/page', 'https://notexample.test/page'],
     'local URLs and ports are hidden without hiding similar external names');
+ok(!grep($_ eq '/missing', @{rows($hidden, 'requests')}), '404 excluded from requested files');
+ok(!grep($_ eq '/missing.css', @{rows($hidden, 'static_requests')}),
+    'static 404 excluded from static requests');
+is_deeply([sort @{rows($hidden, 'not_found')}],
+    ['/missing', '/missing.css', '/mixed'], '404 requests remain in the error panel');
+my ($mixed) = grep { $_->{data} eq '/mixed' } @{$hidden->{requests}->{data}};
+is($mixed->{hits}->{count}, 1, 'mixed-status URL counts only its non-404 request');
 $options{settings}->{hide_local_referrers} = 0;
 my $shown = report_data(\%options);
 is(scalar(@{rows($shown, 'referring_sites')}), 6, 'disabled filter restores local referrers');
