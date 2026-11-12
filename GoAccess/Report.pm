@@ -140,10 +140,12 @@ $s =~ s/'/&#39;/g;
 return $s;
 }
 
-# command(binary, settings, title) builds an argument list for one HTML/JSON run.
+# command(binary, settings, title, [databases], [hostnames], [panels], [warnings]) builds
+# one run. Database paths and omitted panels come from module configuration,
+# not domain-owner input.
 sub command
 {
-my ($binary, $s, $title) = @_;
+my ($binary, $s, $title, $databases, $hostnames, $panels, $warnings) = @_;
 my @cmd = ($binary, '--no-global-config', '--no-progress', '--no-term-resolver',
            '--log-file=input.log',
            '--output=report.html', '--output=report.json',
@@ -166,6 +168,20 @@ push @cmd, '--keep-last='.$s->{keep_days} if $s->{keep_days};
 push @cmd, '--anonymize-ip' if $s->{anonymize};
 push @cmd, '--no-query-string' if $s->{no_query};
 push @cmd, '--ignore-crawlers' if $s->{ignore_crawlers};
+# Explicit database arguments work while global parser settings stay disabled.
+foreach my $path (@{$databases || []}) {
+    die "GeoIP database paths must be absolute paths without control characters\n"
+        unless defined($path) && !ref($path) && length($path) <= 4096 &&
+               $path =~ m{\A/[^\x00-\x1f\x7f]+\z};
+    push @cmd, '--geoip-database='.$path;
+}
+# GoAccess shows the location and network panels once any database is set.
+# The caller omits the panel that its databases cannot fill.
+foreach my $panel (@{$panels || []}) {
+    die "Invalid GeoIP panel\n"
+        unless defined($panel) && !ref($panel) && $panel =~ /\A(?:GEO_LOCATION|ASN)\z/;
+    push @cmd, '--ignore-panel='.$panel;
+}
 return @cmd;
 }
 
@@ -213,13 +229,44 @@ close($fh);
 return $data;
 }
 
+# check_geoip(binary, databases, uid, gid) tests GeoIP with one synthetic request.
+# The normal worker enforces the account's permissions and a short time limit.
+# No website logs or published reports are read or changed.
+sub check_geoip
+{
+my ($binary, $databases, $uid, $gid) = @_;
+return unless @$databases;
+my $work = tempdir('virtualmin-goaccess-check-XXXXXXXX', TMPDIR => 1);
+my $error;
+eval {
+    chmod(0755, $work) or die "Cannot open GeoIP check directory: $!\n";
+    open(my $log, '>', "$work/access.log") or die "Cannot create GeoIP check log: $!\n";
+    print {$log} '192.0.2.1 - - [01/Jan/2026:00:00:00 +0000] '.
+        '"GET / HTTP/1.1" 200 1 "-" "GeoIP check"'."\n";
+    close($log) or die "Cannot save GeoIP check log: $!\n";
+    chmod(0644, "$work/access.log") or die "Cannot open GeoIP check log: $!\n";
+    generate({binary => $binary, settings => {rotated => 0},
+        title => 'GeoIP setup check', log => "$work/access.log",
+        uid => $uid, gid => $gid, timeout => 10, max_logs => 1,
+        geoip_databases => $databases});
+};
+$error = $@;
+remove_tree($work, {safe => 1});
+die "GeoIP setup check failed: $error" if $error;
+}
+
 # generate(options) runs the parser with the site's UID/GID and a time limit.
 # Required: binary, settings, title, log, uid, gid, timeout, max_logs.
+# Optional: geoip_databases, hostnames and ignore_panels are
+# administrator-controlled lists.
 # Returns HTML and summary data; it does not modify the last published report.
 sub generate
 {
 my ($o) = @_;
 my $s = validate($o->{settings});
+my @warnings;
+my @cmd = command($o->{binary}, $s, $o->{title}, $o->{geoip_databases},
+                  $o->{hostnames}, $o->{ignore_panels}, \@warnings);
 die "Invalid GoAccess executable\n" unless $o->{binary} =~ m{\A/} && -x $o->{binary};
 foreach my $k (qw(uid gid timeout max_logs)) {
     die "Invalid $k\n" unless defined($o->{$k}) && $o->{$k} =~ /\A\d+\z/;
@@ -266,6 +313,23 @@ eval {
                 POSIX::setuid($o->{uid}) == 0 or die "Cannot set report user: $!\n";
             }
             die "Incorrect report identity\n" if $> != $o->{uid} || $< != $o->{uid};
+            if (@{$o->{geoip_databases} || []}) {
+                # Older or non-MMDB builds cannot use the configured databases.
+                open(my $version, '-|', $o->{binary}, '--no-global-config', '--version')
+                    or die "Cannot check GoAccess build: $!\n";
+                my $build = do { local $/; <$version> };
+                close($version) or die "Cannot check GoAccess build\n";
+                die "GeoIP reporting requires GoAccess 1.7 or later.\n"
+                    unless ($build || '') =~ /GoAccess\s*-\s*(\d+)\.(\d+)/ &&
+                        ($1 > 1 || ($1 == 1 && $2 >= 7));
+                die "GoAccess must be built with GeoIP2 support (--enable-geoip=mmdb).\n"
+                    unless ($build || '') =~ /--enable-geoip=mmdb\b/;
+            }
+            # Check database access as the same account that runs GoAccess.
+            foreach my $path (@{$o->{geoip_databases} || []}) {
+                die "GeoIP database is not a readable file for the domain owner: $path\n"
+                    unless -f $path && -r $path;
+            }
             my $info = collect_logs($logs, 'input.log');
             open(my $meta, '>', 'input.json') or die "Cannot create input metadata: $!\n";
             print {$meta} encode_json($info);
@@ -276,7 +340,6 @@ eval {
             }
             else {
                 # Use list-form execution so log formats never reach a shell.
-                my @cmd = command($o->{binary}, $s, $o->{title});
                 system { $cmd[0] } @cmd;
                 die "GoAccess failed (status $?)\n" if $?;
             }

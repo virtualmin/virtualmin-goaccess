@@ -1,7 +1,7 @@
 desc=GoAccess Reports
 category=servers
 depends=2.670 cron virtual-server
-rpm_recommends=goaccess
+rpm_recommends=goaccess geolite2-country
 deb_recommends=goaccess
 version=1.0.1
 os_support=*-linux freebsd

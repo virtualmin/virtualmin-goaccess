@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# integration.pl(domain) exercises an existing disposable ga-test-* domain.
+# integration.pl(domain, [database-directory]) tests a disposable ga-test-* domain.
 use strict;
 use warnings;
 use Test::More;
@@ -20,6 +20,7 @@ require './virtualmin-goaccess-lib.pl';
 require './virtual_feature.pl';
 &virtual_server::set_all_null_print();
 my $name = shift(@ARGV) || '';
+my $databases = shift(@ARGV);
 die "A disposable fixture domain is required\n" unless $name =~ /\Aga-test-[a-f0-9]+\.example\.test\z/;
 my $d = &virtual_server::get_domain_by('dom', $name);
 die "Fixture does not exist\n" unless $d && $d->{$module_name};
@@ -293,6 +294,70 @@ ok(&feature_disable($d), 'suspension tolerates missing report state');
 ok(-f "$dir/paused", 'missing state is recreated as paused');
 ok(&feature_delete($d), 'temporary paused state can be removed');
 ok(&feature_setup($d), 'feature can be enabled again after removal');
+
+my $filtered_settings = GoAccess::Report::defaults();
+$filtered_settings->{rotated} = 0;
+$filtered_settings->{anonymize} = 0;
+$filtered_settings->{schedule} = 'manual';
+&state_lock($d, sub {
+    &save_settings($d, $filtered_settings);
+    &sync_cron($d, $filtered_settings);
+});
+my $local_request = entry('21', '81.2.69.142', '/local');
+$local_request =~ s/"-"/"https:\/\/$d->{dom}\/"/;
+my $alias_request = entry('21', '81.2.69.142', '/alias');
+$alias_request =~ s/"-"/"https:\/\/www.$d->{dom}\/"/;
+write_log($log, $local_request.$alias_request.entry('21', '1.0.0.1', '/network'));
+$status = &generate_report($d);
+is($status->{general}->{valid_requests}, 3, 'local navigation still counts in domain reports');
+
+# report_data() reads the latest fixture's embedded GoAccess data.
+sub report_data
+{
+my $html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+my ($json) = $html =~ /var json_data\s*=\s*(\{.*)/s;
+die "Missing report data\n" unless $json;
+my ($data) = JSON::PP->new->decode_prefix($json);
+return $data;
+}
+my $data = report_data();
+
+# Optional public MMDB fixtures exercise administrator configuration end to end.
+SKIP: {
+    skip 'Pass a MaxMind test-database directory to test GeoIP integration', 9
+        unless $databases;
+    local $config{geoip_city} = "$databases/GeoIP2-City-Test.mmdb";
+    local $config{geoip_country} = "$databases/unused-country.mmdb";
+    local $config{geoip_asn} = "$databases/GeoLite2-ASN-Test.mmdb";
+    is(&check_goaccess($d, 1), undef, 'GeoIP setup check accepts active City and ASN files');
+    &generate_report($d);
+    $data = report_data();
+    like(encode_json($data->{hosts}), qr/London/, 'City setting takes precedence over Country');
+    like(encode_json($data->{asn}), qr/Google/, 'ASN setting reaches the report worker');
+    $config{geoip_city} = '';
+    $config{geoip_country} = "$databases/GeoIP2-Country-Test.mmdb";
+    &generate_report($d);
+    $data = report_data();
+    like(encode_json($data->{geolocation}), qr/United Kingdom/, 'Country setting works without City');
+    # A panel appears only when its own database is configured.
+    $config{geoip_asn} = '';
+    &generate_report($d);
+    $data = report_data();
+    ok(exists($data->{geolocation}) && !exists($data->{asn}), 'ASN panel omitted without an ASN database');
+    $config{geoip_country} = '';
+    $config{geoip_asn} = "$databases/GeoLite2-ASN-Test.mmdb";
+    &generate_report($d);
+    $data = report_data();
+    ok(exists($data->{asn}) && !exists($data->{geolocation}), 'location panel omitted with only an ASN database');
+    $config{geoip_country} = "$databases/missing.mmdb";
+    like(&check_goaccess($d, 1), qr/GeoIP database is not a readable file/,
+        'GeoIP setup error is available before report generation');
+    my $previous = sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024));
+    eval { &generate_report($d); };
+    like($@, qr/GeoIP database is not a readable file/, 'configured database failure reaches the caller');
+    is(sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024)),
+        $previous, 'failed GeoIP setup check preserves the published report');
+}
 
 # Finish with a combined-format dashboard for the HTTP and browser checks.
 my $original = GoAccess::Report::defaults();

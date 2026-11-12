@@ -1,4 +1,5 @@
 #### Unreleased
+* Add module settings for GeoIP2 Country, City and ASN databases
 * Add a link from reports to the website's access-log search
 
 #### Version 1.0.1

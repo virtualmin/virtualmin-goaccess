@@ -43,6 +43,25 @@ ok(grep($_ eq '--html-report-title=Example &amp; site', @cmd), 'HTML title escap
 ok(grep($_ eq '--no-global-config', @cmd), 'global parser configuration ignored');
 ok(grep(/\A--html-prefs=.*"theme":"bright"/, @cmd), 'downloads default to the bright theme');
 
+# Database paths stay separate from owner settings and shell interpretation.
+@cmd = GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example',
+    ['/srv/GeoIP data/City.mmdb', '/srv/ASN.mmdb'],
+    ['Example.test', 'example.test', 'www.example.test', '*.sub.example.test', '~.*', '_']);
+ok(grep($_ eq '--geoip-database=/srv/GeoIP data/City.mmdb', @cmd),
+    'database paths with spaces remain single arguments');
+is(scalar(grep(/^--geoip-database=/, @cmd)), 2, 'City and ASN databases passed together');
+my $owner = GoAccess::Report::validate({geoip_databases => ['/private/db'], hostnames => ['*']});
+ok(!exists($owner->{geoip_databases}) && !exists($owner->{hostnames}),
+    'owners cannot override database paths or website hostnames');
+foreach my $path ('relative.mmdb', "/db\n--option", "/db\x00", []) {
+    eval { GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example', [$path]); };
+    like($@, qr/GeoIP database paths/, 'invalid database path rejected');
+}
+@cmd = GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example',
+    ['/srv/City.mmdb'], [], ['ASN']);
+ok(grep($_ eq '--ignore-panel=ASN', @cmd), 'panel without a database omitted');
+eval { GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example', [], [], ['VISITORS']); };
+like($@, qr/Invalid GeoIP panel/, 'only GeoIP panels can be omitted');
 my $tmp = tempdir(CLEANUP => 1);
 
 # write_fixture(path, text) writes a small test log in the private test directory.

@@ -1,4 +1,7 @@
 goaccess=Full path to GoAccess,0
+geoip_country=GeoIP2 Country database,0
+geoip_city=GeoIP2 City database,0
+geoip_asn=GeoIP2 ASN database,0
 timeout=Maximum report generation time in seconds,0
 max_logs=Maximum log files per report,0
 noedit=Allow domain owners to change report settings?,1,0-Yes,1-No

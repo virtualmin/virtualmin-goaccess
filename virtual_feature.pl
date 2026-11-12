@@ -254,7 +254,7 @@ return $ok ? 1 : 0;
 sub feature_validate
 {
 my ($d) = @_;
-my $error = &check_goaccess() || &feature_depends($d);
+my $error = &check_goaccess($d, 1) || &feature_depends($d);
 return $error if $error;
 my $dir = &domain_dir($d);
 return $text{'feat_missing'} unless -f "$dir/settings.json";

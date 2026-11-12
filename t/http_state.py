@@ -1,7 +1,8 @@
 """HTTP regressions for a disposable ga-test-* domain with manual updates.
 
-Call check_log_states() on the VM with an authenticated request callback.
-The callback accepts a CGI path and returns body, headers and HTTP status.
+Call check_log_states(), check_report_controls() or check_geoip_setup() with an
+authenticated callback. The callback accepts a CGI path and returns body,
+headers and HTTP status. check_geoip_setup() also passes a form to POST.
 """
 from html.parser import HTMLParser
 from html import unescape
@@ -9,7 +10,61 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 from urllib.parse import parse_qs, urljoin, urlsplit
+
+
+def check_geoip_setup(request, domain_id, databases, state_dir):
+    config_path = Path('/etc/webmin/virtualmin-goaccess/config')
+    saved_config = config_path.read_bytes()
+    config = dict(line.split('=', 1) for line in saved_config.decode().splitlines() if '=' in line)
+    assert domain_id.isdigit() and Path(state_dir).name == domain_id
+    assert json.loads((Path(state_dir) / 'settings.json').read_text())['schedule'] == 'manual'
+    valid = dict(config, module='virtualmin-goaccess', save='1',
+                 geoip_city=str(Path(databases) / 'GeoIP2-City-Test.mmdb'),
+                 geoip_asn=str(Path(databases) / 'GeoLite2-ASN-Test.mmdb'))
+    try:
+        body, _, code = request('/config.cgi?module=virtualmin-goaccess')
+        assert code == 200 and b'name="geoip_city"' in body, 'Standard module fields must render'
+        body, _, code = request('/config_save.cgi', valid)
+        assert code in (200, 302) and valid['geoip_city'].encode() in config_path.read_bytes(), \
+            'Valid GeoIP settings must be saved'
+        accepted = config_path.read_bytes()
+        broken = Path(databases) / 'broken.mmdb'
+        broken.write_text('not a MaxMind database')
+        broken.chmod(0o644)
+        unsupported = Path(databases) / 'no-geoip'
+        unsupported.write_text("#!/bin/sh\necho 'GoAccess - 1.9.3. --enable-utf8'\n")
+        unsupported.chmod(0o755)
+        cases = [({'geoip_city': str(Path(databases) / 'missing.mmdb')}, b'not a readable file'),
+                 ({'geoip_city': str(broken)}, b'Unable to open GeoIP2 database'),
+                 ({'goaccess': str(unsupported)}, b'GoAccess must be built with GeoIP2 support')]
+        for change, expected in cases:
+            body, _, code = request('/config_save.cgi', dict(valid, **change))
+            assert expected in body, 'Invalid database must have a visible save error: ' + str(code)
+            assert config_path.read_bytes() == accepted, 'Rejected settings must not replace working settings'
+
+        # Viewing a report must not rerun the parser after a database breaks.
+        calls = Path(databases) / 'parser-calls'
+        calls.write_bytes(b'')
+        calls.chmod(0o666)
+        probe = Path(databases) / 'goaccess-probe'
+        probe.write_text('#!/bin/sh\nprintf x >> ' + shlex.quote(str(calls)) +
+                         '\nexec ' + shlex.quote(config['goaccess']) + ' "$@"\n')
+        probe.chmod(0o755)
+        broken_config = dict(valid, geoip_city=str(broken), goaccess=str(probe))
+        config_path.write_text(''.join(key + '=' + value + '\n' for key, value in broken_config.items()
+                                      if key not in ('module', 'save')))
+        body, _, code = request('/virtualmin-goaccess/view.cgi?dom=' + domain_id)
+        assert code == 200 and b'GeoIP setup check failed' not in body
+        assert b'id="goaccess-frame"' in body, 'A broken database must leave report viewing available'
+        body, _, code = request('/virtualmin-goaccess/')
+        assert code == 200 and b'GeoIP setup check failed' not in body
+        assert calls.read_bytes() == b'', 'Viewing reports must not invoke GoAccess'
+        config_path.write_bytes(accepted)
+
+    finally:
+        config_path.write_bytes(saved_config)
 
 
 def check_report_controls(request, domain_id, admin=False):
@@ -23,6 +78,12 @@ def check_report_controls(request, domain_id, admin=False):
     body, _, code = request(urljoin(view, log_link))
     assert code == 200 and b'name="filter"' in body, 'Access-log search must open'
     assert b'/index.html' in body, 'Access-log search must show this fixture log'
+    if admin:
+        # Only administrators can set shared database paths.
+        body, _, code = request('/config.cgi?virtualmin-goaccess')
+        assert code == 200
+        for field in ('geoip_country', 'geoip_city', 'geoip_asn'):
+            assert ('name="' + field + '"').encode() in body
     print('HTTP report controls passed for ' + ('administrator' if admin else 'domain owner'), flush=True)
 
 

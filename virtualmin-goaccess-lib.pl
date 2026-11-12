@@ -215,15 +215,32 @@ sub require_post
 ($ENV{'REQUEST_METHOD'} || '') eq 'POST' || &error($text{'error_post'});
 }
 
-# check_goaccess() reports an unavailable binary or invalid administrator limits.
+# check_goaccess([domain], [geoip]) checks the executable and limits.
+# Request a GeoIP check only when saving settings or explicitly validating a
+# domain. It uses that site's owner, an enabled site's owner, or nobody.
 sub check_goaccess
 {
+my ($d, $geoip) = @_;
 return $text{'error_binary'} unless ($config{'goaccess'} || '') =~ m{\A/}
     && -x $config{'goaccess'};
 return $text{'error_limits'} unless ($config{'timeout'} || '') =~ /\A\d+\z/
     && $config{'timeout'} >= 1 && $config{'timeout'} <= 3600
     && ($config{'max_logs'} || '') =~ /\A\d+\z/
     && $config{'max_logs'} >= 1 && $config{'max_logs'} <= 10000;
+my @databases = grep { defined($_) && length($_) }
+    ($config{'geoip_city'} || $config{'geoip_country'}, $config{'geoip_asn'});
+if (@databases && $geoip) {
+    # Save the executable before loading domain data can rebind module globals.
+    my $binary = $config{'goaccess'};
+    ($d) = grep { $_->{$module_name} && !$_->{'disabled'} }
+        &virtual_server::list_domains() unless $d;
+    my $account = $d ? $d->{'user'} : 'nobody';
+    my @owner = getpwnam($account);
+    return "Cannot check GeoIP databases: no non-root account is available."
+        unless @owner && $owner[2] > 0;
+    eval { GoAccess::Report::check_geoip($binary, \@databases, @owner[2, 3]); };
+    return $@ if $@;
+}
 return undef;
 }
 
@@ -298,10 +315,22 @@ return &domain_lock($d, sub {
         die "$err\n" if $err;
         my @user = getpwnam($d->{'user'});
         die "The domain owner does not exist\n" unless @user;
+        # City databases also contain country data. Prefer City when both
+        # paths are set so a Country lookup cannot mask the city details.
+        my $location = $config{'geoip_city'} || $config{'geoip_country'};
+        my $network = $config{'geoip_asn'};
+        my @databases = grep { defined($_) && length($_) } ($location, $network);
+        # GoAccess shows both GeoIP panels once any database is set. Omit
+        # the panel whose database is missing, as it would list only unknowns.
+        my @ignored = !@databases ? () :
+                      !$location ? ('GEO_LOCATION') :
+                      !$network ? ('ASN') : ();
         $result = GoAccess::Report::generate({binary => $config{'goaccess'},
             settings => $settings, title => "$d->{'dom'} — Web statistics",
             log => $log, uid => $user[2], gid => $user[3],
-            timeout => $config{'timeout'}, max_logs => $config{'max_logs'}});
+            timeout => $config{'timeout'}, max_logs => $config{'max_logs'},
+            geoip_databases => \@databases,
+            ignore_panels => \@ignored});
         # Webmin writes a temporary file and renames it, so a failed write
         # leaves the previous report in place.
         &write_file_contents("$dir/report.html", delete($result->{'html'}));

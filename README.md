@@ -15,6 +15,16 @@ reports for Apache and Nginx websites.
 - Webmin 2.670 or later with Virtualmin 8.2 or later
 - GoAccess 1.7 or later
 
+The module packages recommend these distribution packages:
+
+| Distribution | Packages | GoAccess path |
+| --- | --- | --- |
+| AlmaLinux and Rocky Linux | `goaccess` from EPEL, `geolite2-country` from AppStream | `/usr/bin/goaccess` |
+| Debian and Ubuntu | `goaccess` | `/usr/bin/goaccess` |
+
+GoAccess installs its required libraries through the package manager. FreeBSD
+defaults to `/usr/local/bin/goaccess`.
+
 ## Usage
 
 Enable **GoAccess reporting** in **System Settings → Features and Plugins**, then
@@ -31,12 +41,70 @@ To enable reporting for a virtual server from the command line, run as root:
 virtualmin enable-feature --domain example.com --virtualmin-goaccess
 ```
 
+### GeoIP databases
+
+New installations on AlmaLinux and Rocky Linux 8 or later use
+`/usr/share/GeoIP/GeoLite2-Country.mmdb` from `geolite2-country` by default.
+Webmin selects the matching OS/version config file and preserves saved settings
+during upgrades, including blank database paths. The packaged Country database
+may be outdated. Use an updated database for current location data.
+
+Debian and Ubuntu start with GeoIP disabled. Their `geoip-database` package
+contains legacy `.dat` files that cannot be used by this module's GeoIP2 support.
+Install compatible `.mmdb` databases separately. City and ASN databases are
+optional on all distributions.
+
+Set the full paths to installed MaxMind GeoIP2 or GeoLite2 `.mmdb` databases to
+include visitor location and network details in reports. A City database provides
+country and city details and takes precedence over a Country database. A Country
+database provides country details only. An optional GeoLite2 ASN database adds
+network numbers and organizations. Leaving all database paths blank disables
+GeoIP lookups.
+
+City details are listed for individual visitor IP addresses. IP anonymization
+can make these details less accurate or unavailable.
+
+GeoIP reporting requires GoAccess 1.7 or later built with GeoIP2 support. Check
+for `--enable-geoip=mmdb` in `goaccess --version`. Each domain owner must be able
+to read the database files and access their parent directories. Download and
+update the databases separately. Changes apply to the next report update.
+The module ignores the global `goaccess.conf` file.
+
+Saving module settings checks that GoAccess supports GeoIP2 and can open the
+active databases. Invalid settings are rejected. Validating a virtual server
+also checks database access as its owner. A Country database is not checked
+while a City database is configured.
+
+These GeoIP checks do not run when viewing reports or enabling reporting. If a
+report update fails, the previous report remains available and the error is shown.
+
 ## Tests
 
 ```sh
 prove t/report.t
 node t/report-sync.js
 node t/report-tooltips.js
+```
+
+Test OS-specific defaults and upgrade preservation with Webmin's config installer:
+
+```sh
+perl t/config.pl /path/to/webmin
+```
+
+On a disposable Linux VM with GoAccess installed, add `--live` and run as root
+to generate a report as `nobody` using the distribution defaults. This also
+checks access to the configured Country database. It does not change installed
+module settings or reports.
+
+On a disposable test VM, `t/parser.pl` tests real report generation with
+MaxMind's public `GeoIP2-City-Test.mmdb`, `GeoIP2-Country-Test.mmdb` and
+`GeoLite2-ASN-Test.mmdb` files from the
+[MaxMind-DB test data](https://github.com/maxmind/MaxMind-DB/tree/main/test-data).
+Pass the GoAccess executable and database directory:
+
+```sh
+perl t/parser.pl /usr/bin/goaccess /tmp/geoip-test-databases
 ```
 
 ## License

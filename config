@@ -1,4 +1,7 @@
 goaccess=/usr/bin/goaccess
+geoip_country=
+geoip_city=
+geoip_asn=
 timeout=300
 max_logs=1000
 noedit=0

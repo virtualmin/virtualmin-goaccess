@@ -1,0 +1,13 @@
+<header>GeoIP2 Country database</header>
+<p>A MaxMind GeoIP2 or GeoLite2 Country <tt>.mmdb</tt> database adds visitor
+country details to reports. Use the full path to the installed file. Leaving
+this blank omits country lookups unless a City database is configured. A City
+database provides both country and city details and is used instead when
+configured.</p>
+<p>GeoIP reporting requires GoAccess 1.7 or later built with GeoIP2 support.
+Each domain owner must be able to read the file and access its parent
+directories. New installations on AlmaLinux and Rocky Linux 8 or later default
+to <tt>/usr/share/GeoIP/GeoLite2-Country.mmdb</tt> from <tt>geolite2-country</tt>.
+The packaged database may be outdated. Install and update a current database
+separately. Changes apply to the next report update.</p>
+<footer>

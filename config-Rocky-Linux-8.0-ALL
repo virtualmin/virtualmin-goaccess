@@ -1,0 +1,8 @@
+goaccess=/usr/bin/goaccess
+geoip_country=/usr/share/GeoIP/GeoLite2-Country.mmdb
+geoip_city=
+geoip_asn=
+timeout=300
+max_logs=1000
+noedit=0
+schedule=hourly
