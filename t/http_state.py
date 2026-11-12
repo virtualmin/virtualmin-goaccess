@@ -4,10 +4,26 @@ Call check_log_states() on the VM with an authenticated request callback.
 The callback accepts a CGI path and returns body, headers and HTTP status.
 """
 from html.parser import HTMLParser
+from html import unescape
 import json
 import os
 from pathlib import Path
 import re
+from urllib.parse import parse_qs, urljoin, urlsplit
+
+
+def check_report_controls(request, domain_id, admin=False):
+    view = '/virtualmin-goaccess/view.cgi?dom=' + domain_id
+    body, _, code = request(view)
+    assert code == 200
+    links = [unescape(link) for link in re.findall(r'href="([^"]+)"', body.decode())]
+    log_link = next(link for link in links if 'logviewer/view_log.cgi?' in link)
+    query = parse_qs(urlsplit(log_link).query)
+    assert ('file' if admin else 'extra') in query
+    body, _, code = request(urljoin(view, log_link))
+    assert code == 200 and b'name="filter"' in body, 'Access-log search must open'
+    assert b'/index.html' in body, 'Access-log search must show this fixture log'
+    print('HTTP report controls passed for ' + ('administrator' if admin else 'domain owner'), flush=True)
 
 
 class Forms(HTMLParser):

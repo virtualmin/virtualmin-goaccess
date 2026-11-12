@@ -42,6 +42,7 @@ auto_daily=Reports update automatically every day
 auto_manual=Reports update on request
 schedule_paused=Automatic updates are paused
 download=Download HTML
+search_log=Search access log
 generate=Update Report
 gen_doing=Updating the report for $1 from $2 ..
 gen_done=.. done

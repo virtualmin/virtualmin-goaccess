@@ -1,3 +1,6 @@
+#### Unreleased
+* Add a link from reports to the website's access-log search
+
 #### Version 1.0.1
 * Add GoAccess reports for Apache and Nginx websites as a Virtualmin feature
 * Add hourly, daily or manual report updates

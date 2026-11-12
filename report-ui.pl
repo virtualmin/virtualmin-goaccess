@@ -31,6 +31,20 @@ return &ui_link_icon('edit.cgi?dom='.$d->{'id'},
                      &html_escape($text{'report_settings'}), $icon);
 }
 
+# report_log_link(domain, [icon]) opens the existing access-log search.
+# Webmin's log viewer enforces its own module and per-file permissions.
+sub report_log_link
+{
+my ($d, $icon) = @_;
+return '' unless &foreign_available('logviewer');
+my $log = &virtual_server::get_website_log($d);
+return '' unless $log;
+my $param = &virtual_server::master_admin() ? 'file' : 'extra';
+return &ui_link_icon('../logviewer/view_log.cgi?view=1&amp;nonavlinks=1&amp;'.
+                     $param.'='.&urlize($log),
+                     &html_escape($text{'search_log'}), $icon);
+}
+
 # report_frame(domain) embeds the sandboxed report with a loading spinner
 # and the script that sends the page's palette and fonts.
 sub report_frame

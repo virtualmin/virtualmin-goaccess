@@ -22,6 +22,9 @@ enable it for a virtual server. Open the report under
 **Logs and Reports → GoAccess Report**. Reports update on a schedule or on demand.
 Use **GoAccess Configuration** to set the log format, schedule and filters.
 
+Users with permission to read the website's access log can search individual
+requests.
+
 To enable reporting for a virtual server from the command line, run as root:
 
 ```sh

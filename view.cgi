@@ -18,6 +18,7 @@ my $exists = -f "$dir/report.html" && !$empty;
 my $paused = $d->{'disabled'} || -e "$dir/paused";
 my $can_generate = &allowed_domain($d->{'id'}, 'generate') && !$paused;
 my $can_configure = &allowed_domain($d->{'id'}, 'configure');
+my $search_log = &report_log_link($d, 'search');
 &ui_print_header(&virtual_server::domain_in($d), $text{'links_report'}, '', undef, 0, 1);
 print &ui_page_start({ 'id' => 'goaccess-view', 'class' => 'goaccess' });
 # Keep summary text at the page's font size, align its actions with the title
@@ -47,6 +48,7 @@ if ($exists) {
     push(@actions, &ui_link_icon('report.cgi?dom='.$d->{'id'}.'&amp;download=1',
                                  &html_escape($text{'download'}), 'download'));
     push(@actions, &report_settings_link($d, 'cog')) if $can_configure;
+    push(@actions, $search_log) if $search_log;
     $card{'actions'} = \@actions;
     # The date formatter returns trusted theme markup for a validated timestamp.
     $card{'desc_html'} = &html_escape($text{'updated'}.': ').&make_date($status->{'generated'})
@@ -67,9 +69,10 @@ else {
         !$data ? ('inbox', 'nolog_title', 'nolog_description') :
         ('globe', 'empty_title', $can_generate ? 'empty_description' :
             $settings->{'schedule'} eq 'manual' ? 'empty_readonly_manual' : 'empty_readonly');
-    # Show permitted actions below the message, without icons.
+    # Show permitted actions below the message.
     my @first = grep { $_ } (($data || $log_error) && $can_generate ? &report_generate_form($d, 1) : undef,
-                             $can_configure ? &report_settings_link($d) : undef);
+                             $can_configure ? &report_settings_link($d) : undef,
+                             $search_log);
     my $actions = @first ? &ui_cluster(\@first, { 'align' => 'center' }) : '';
     if ($log_error) {
         # Show the failed check and keep permitted retry and settings actions.
