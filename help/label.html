@@ -1,14 +1,15 @@
 <header>GoAccess reporting</header>
 <p>GoAccess creates an interactive HTML dashboard from a website's access logs.
 Reports include requests, visitors, bandwidth, status codes, referrers and browsers
-when those fields are present in the logs.</p>
-<p>Reports are private and available through Virtualmin's Logs and Reports menu.
-Inside Webmin, the dashboard follows the theme's light or dark palette. Reports
-update hourly by default. Users with permission can also update them on demand
-or download a standalone HTML copy.</p>
+when those fields are present in the logs. Reports update hourly by default and
+are private to users with access to the domain. Users with permission can update
+them on demand or download a standalone HTML copy. The dashboard follows Webmin's
+light or dark theme.</p>
 <p>Each update reads the current log and, by default, its numbered or dated
 rotations, including gzip files. The report covers only the logs included in
-that update. Older statistics disappear when those logs are removed or excluded.
-Keep older logs if you need a longer reporting history. AWStats databases are
-not imported, and enabling GoAccess does not change AWStats.</p>
+that update. Older statistics disappear after an update if those logs have been
+removed or excluded. Keep older logs for a longer reporting history.</p>
+<p>Suspending reporting pauses updates and keeps settings and the last report.
+Re-enabling it restores the saved schedule. Removing reporting deletes its
+settings, reports and scheduled updates. Website logs are kept.</p>
 <footer>

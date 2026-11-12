@@ -27,19 +27,27 @@ defaults to `/usr/local/bin/goaccess`.
 
 ## Usage
 
-Enable **GoAccess reporting** in **System Settings → Features and Plugins**, then
-enable it for a virtual server. Open the report under
-**Logs and Reports → GoAccess Report**. Reports update on a schedule or on demand.
-Use **GoAccess Configuration** to set the log format, schedule and filters.
+Enable GoAccess reporting globally, then for each virtual server that needs it.
+Each server must have a website, a Unix owner and a home directory. Reports
+update hourly by default. Users with access can view and download reports.
+Separate permissions control on-demand updates and changes to the log format,
+schedule and filters.
+
+Each update rebuilds the report from the current access log and, by default,
+numbered or dated rotations, including gzip files. Older statistics disappear
+after an update if those logs have been removed or excluded. Keep older logs
+for a longer reporting history.
+
+Suspending reporting pauses updates and keeps settings and the last report.
+Re-enabling it restores the saved schedule. Removing reporting deletes its
+settings, reports and scheduled updates. Website logs are kept.
 
 Referrers from the website's own hostnames and configured aliases are hidden by
 default. Their requests still count toward page views, visitors and bandwidth.
 Disabling the filter includes local referrers again after the next report update.
-The filter covers the first 32 distinct DNS names or wildcard subdomains.
-GoAccess allows 64 referrer filters, and each name needs two to match referrers
-with and without an explicit port.
-Reports still update if the website has more names, but warn that some local
-referrers may appear.
+The filter covers the first 32 distinct DNS names or wildcard subdomains, with
+or without an explicit port. Reports still update if the website has more names,
+but warn that some local referrers may appear.
 
 Users with permission to read the website's access log can search individual
 requests.
@@ -59,9 +67,9 @@ HTTP 200 counts as a normal request.
 
 New installations on AlmaLinux and Rocky Linux 8 or later use
 `/usr/share/GeoIP/GeoLite2-Country.mmdb` from `geolite2-country` by default.
-Webmin selects the matching OS/version config file and preserves saved settings
-during upgrades, including blank database paths. The packaged Country database
-may be outdated. Use an updated database for current location data.
+Upgrades preserve saved settings, including blank database paths. The packaged
+Country database may be outdated. Use an updated database for current location
+data.
 
 Debian and Ubuntu start with GeoIP disabled. Their `geoip-database` package
 contains legacy `.dat` files that cannot be used by this module's GeoIP2 support.
@@ -76,7 +84,7 @@ network numbers and organizations. Leaving all database paths blank disables
 GeoIP lookups.
 
 City details are listed for individual visitor IP addresses. IP anonymization
-can make these details less accurate or unavailable.
+is enabled by default and can make these details less accurate or unavailable.
 
 GeoIP reporting requires GoAccess 1.7 or later built with GeoIP2 support. Check
 for `--enable-geoip=mmdb` in `goaccess --version`. Each domain owner must be able
@@ -84,10 +92,11 @@ to read the database files and access their parent directories. Download and
 update the databases separately. Changes apply to the next report update.
 The module ignores the global `goaccess.conf` file.
 
-Saving module settings checks that GoAccess supports GeoIP2 and can open the
-active databases. Invalid settings are rejected. Validating a virtual server
-also checks database access as its owner. A Country database is not checked
-while a City database is configured.
+When database paths are set, saving module settings checks that GoAccess
+supports GeoIP2 and can open the active databases. The checks run as an enabled
+domain's owner, or as `nobody` if no domain is enabled. Invalid settings are
+rejected. Validating a virtual server checks database access as that server's
+owner. A Country database is not checked while a City database is configured.
 
 These GeoIP checks do not run when viewing reports or enabling reporting. If a
 report update fails, the previous report remains available and the error is shown.
