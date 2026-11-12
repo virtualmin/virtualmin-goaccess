@@ -31,7 +31,7 @@ foreach my $d (@domains) {
     next if $d->{'disabled'} || -f (&domain_dir($d).'/paused');
     eval { &generate_report($d); };
     if ($@) {
-        print STDERR "$d->{'dom'}: $@";
+        &error_stderr("$d->{'dom'}: $@");
         $failed = 1;
     }
 }
