@@ -4,6 +4,7 @@ use strict;
 use warnings;
 our (%text, %in);
 require './virtualmin-goaccess-lib.pl';
+# Require an authorized POST before starting an update.
 &ReadParse();
 &require_post();
 my $d = &require_domain($in{'dom'}, 'generate');
@@ -22,13 +23,14 @@ if ($err) {
     print &ui_tag('pre', &html_escape($rest)) if defined($rest) && $rest =~ /\S/;
 }
 else {
+    # Log successful updates and show any warnings from the worker.
     &webmin_log('generate', 'domain', $d->{'dom'}, { 'id' => $d->{'id'} });
     print $text{'gen_done'};
     foreach my $warning (@{$result->{'warnings'} || []}) {
         # Successful updates can still have incomplete referrer filtering.
         print &ui_alert(&html_escape($warning), 'warning');
     }
-    # The link to the report stands on its own line under the outcome.
+    # Keep the report link separate from the update result.
     print &ui_tag('div', &ui_tag('a', &html_escape($text{'gen_view'}),
                                  { 'href' => 'view.cgi?dom='.$d->{'id'} }),
                   { 'style' => 'margin-top: 4px' });

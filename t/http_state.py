@@ -15,28 +15,33 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 
 def check_geoip_setup(request, domain_id, databases, state_dir):
-    """Exercise real module-config saves and visible warnings on a test VM.
+    """check_geoip_setup(request, domain_id, databases, state_dir).
 
+    Test GeoIP saves and visible warnings.
     request(path, form=None) sends GET or a form POST as the administrator.
-    Only call for a disposable fixture whose cron updates have been paused.
+    databases holds MMDB fixtures; state_dir holds this domain's saved report.
+    Run only on a disposable VM with the fixture's cron updates paused.
     """
     config_path = Path('/etc/webmin/virtualmin-goaccess/config')
     saved_config = config_path.read_bytes()
     status_path = Path(state_dir) / 'status.json'
     saved_status = status_path.read_bytes()
     config = dict(line.split('=', 1) for line in saved_config.decode().splitlines() if '=' in line)
+    # Avoid racing scheduled updates while replacing fixture state.
     assert domain_id.isdigit() and Path(state_dir).name == domain_id
     assert json.loads((Path(state_dir) / 'settings.json').read_text())['schedule'] == 'manual'
     valid = dict(config, module='virtualmin-goaccess', save='1',
                  geoip_city=str(Path(databases) / 'GeoIP2-City-Test.mmdb'),
                  geoip_asn=str(Path(databases) / 'GeoLite2-ASN-Test.mmdb'))
     try:
+        # Save working database paths before checking rejected changes.
         body, _, code = request('/config.cgi?module=virtualmin-goaccess')
         assert code == 200 and b'name="geoip_city"' in body, 'Standard module fields must render'
         body, _, code = request('/config_save.cgi', valid)
         assert code in (200, 302) and valid['geoip_city'].encode() in config_path.read_bytes(), \
             'Valid GeoIP settings must be saved'
         accepted = config_path.read_bytes()
+        # Supply corrupt data and a parser without GeoIP support.
         broken = Path(databases) / 'broken.mmdb'
         broken.write_text('not a MaxMind database')
         broken.chmod(0o644)
@@ -46,6 +51,7 @@ def check_geoip_setup(request, domain_id, databases, state_dir):
         cases = [({'geoip_city': str(Path(databases) / 'missing.mmdb')}, b'not a readable file'),
                  ({'geoip_city': str(broken)}, b'Unable to open GeoIP2 database'),
                  ({'goaccess': str(unsupported)}, b'GoAccess must be built with GeoIP2 support')]
+        # Failed validation must preserve the last accepted settings.
         for change, expected in cases:
             body, _, code = request('/config_save.cgi', dict(valid, **change))
             assert expected in body, 'Invalid database must have a visible save error: ' + str(code)
@@ -70,7 +76,7 @@ def check_geoip_setup(request, domain_id, databases, state_dir):
         assert calls.read_bytes() == b'', 'Viewing reports must not invoke GoAccess'
         config_path.write_bytes(accepted)
 
-        # Warnings must be visible and escaped without being treated as failures.
+        # Warnings must be escaped and leave the report available.
         status = json.loads(saved_status)
         warning = 'Local referrers are hidden for only 32 of 40 website names. <test>'
         status['warnings'] = [warning]
@@ -82,18 +88,23 @@ def check_geoip_setup(request, domain_id, databases, state_dir):
         assert code == 200 and b'Ready with warnings' in body
         print('HTTP GeoIP saves, report viewing and warnings passed', flush=True)
     finally:
+        # Restore both files even if an HTTP assertion fails.
         config_path.write_bytes(saved_config)
         status_path.write_bytes(saved_status)
 
 
 def check_report_controls(request, domain_id, admin=False):
-    """Check the report setting and follow its access-log search as this user."""
+    """check_report_controls(request, domain_id, [admin]) tests report controls.
+
+    request is an authenticated HTTP callback. admin defaults to False for owners.
+    """
     view = '/virtualmin-goaccess/view.cgi?dom=' + domain_id
     body, _, code = request('/virtualmin-goaccess/edit.cgi?dom=' + domain_id)
     assert code == 200 and b'name="hide_local_referrers"' in body
     body, _, code = request(view)
     assert code == 200
     links = [unescape(link) for link in re.findall(r'href="([^"]+)"', body.decode())]
+    # Owner and administrator log links use different permission checks.
     log_link = next(link for link in links if 'logviewer/view_log.cgi?' in link)
     query = parse_qs(urlsplit(log_link).query)
     assert ('file' if admin else 'extra') in query
@@ -113,23 +124,30 @@ class Forms(HTMLParser):
     """Collect form actions without depending on the active Webmin theme."""
 
     def __init__(self):
-        """Start with no form actions."""
+        """__init__() starts with no form actions."""
         super().__init__()
         self.actions = []
 
     def handle_starttag(self, tag, attrs):
-        """Record each form's action URL."""
+        """handle_starttag(tag, attrs) records form action URLs."""
+        # Other HTML elements do not declare form submissions.
         if tag == 'form':
             self.actions.append(dict(attrs).get('action', ''))
 
 
 def check_log_states(request, domain_id, log_path, state_dir, max_logs):
-    """Check failed, empty and paused log states, then restore fixture files."""
+    """check_log_states(request, domain_id, log_path, state_dir, max_logs).
+
+    Test failed, empty and paused reports through the authenticated request
+    callback. Use this fixture's access log, report directory and log limit.
+    Restore changed files afterward.
+    """
     log_path, state_dir = Path(log_path), Path(state_dir)
     fixture = log_path.parent.parent.name
     assert os.geteuid() == 0 and Path('/etc/webmin/virtual-server').is_dir()
     assert re.fullmatch(r'ga-test-[a-f0-9]+', fixture)
     assert domain_id.isdigit() and state_dir.name == domain_id
+    # Save fixture files before simulating broken and empty logs.
     settings_path = state_dir / 'settings.json'
     saved_settings = settings_path.read_bytes()
     settings = json.loads(saved_settings)
@@ -144,13 +162,14 @@ def check_log_states(request, domain_id, log_path, state_dir, max_logs):
     rotations = []
 
     def check(expected, action):
-        """Check the visible state and whether report generation is offered."""
+        """check(expected, action) checks the message and update form."""
         body, _, code = request('/virtualmin-goaccess/view.cgi?dom=' + domain_id)
         assert code == 200 and expected.encode() in body, expected
         forms = Forms()
         forms.feed(body.decode())
         assert any(url.endswith('generate.cgi') for url in forms.actions) == action
         if expected != 'No traffic yet':
+            # Failures and suspension must not be described as empty traffic.
             assert b'No traffic yet' not in body
 
     report.rename(hidden_report)
@@ -187,7 +206,9 @@ def check_log_states(request, domain_id, log_path, state_dir, max_logs):
         for rotation in rotations:
             rotation.unlink(missing_ok=True)
         if hidden_log.exists():
+            # Restore the original log if the non-file check was interrupted.
             if log_path.is_dir():
+                # Remove the temporary directory before moving the log back.
                 log_path.rmdir()
             hidden_log.rename(log_path)
         log_path.write_bytes(saved_log)

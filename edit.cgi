@@ -4,6 +4,7 @@ use strict;
 use warnings;
 our (%text, %in);
 require './virtualmin-goaccess-lib.pl';
+# Require configuration access before reading domain settings.
 &ReadParse();
 my $d = &require_domain($in{'dom'}, 'configure');
 my $s = eval { &load_settings($d) };
@@ -34,6 +35,7 @@ print &ui_table_row($text{'keep_days'}, &ui_select('keep_days', $s->{'keep_days'
     undef, undef, 1));
 print &ui_table_row($text{'max_items'}, &ui_select('max_items', $s->{'max_items'},
     [map { [$_, $_] } qw(10 25 50 100 250 500 1000)], undef, undef, 1));
+# Render the report filters from the same keys used by settings validation.
 foreach my $key (qw(rotated anonymize no_query ignore_crawlers hide_local_referrers)) {
     print &ui_table_row($text{$key}, &ui_yesno_radio($key, $s->{$key}));
 }

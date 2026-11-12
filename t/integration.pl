@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# integration.pl(domain, [database-directory]) tests a disposable ga-test-* domain.
+# integration.pl(domain, [database-directory]) tests a ga-test-* fixture domain.
 use strict;
 use warnings;
 use Test::More;
@@ -21,6 +21,7 @@ require './virtual_feature.pl';
 &virtual_server::set_all_null_print();
 my $name = shift(@ARGV) || '';
 my $databases = shift(@ARGV);
+# Refuse ordinary domains before replacing logs, settings or reports.
 die "A disposable fixture domain is required\n" unless $name =~ /\Aga-test-[a-f0-9]+\.example\.test\z/;
 my $d = &virtual_server::get_domain_by('dom', $name);
 die "Fixture does not exist\n" unless $d && $d->{$module_name};
@@ -43,7 +44,8 @@ chown($owner[2], $owner[3], $path) == 1 or die $!;
 chmod(0640, $path) or die $!;
 }
 
-# entry(day, address, path, [status]) returns a deterministic combined-log line.
+# entry(day, address, path, [status]) returns a fixed-date combined-log line.
+# The status defaults to 200.
 sub entry
 {
 my ($day, $ip, $path, $status) = @_;
@@ -75,6 +77,7 @@ if (!$pid) {
     _exit($ok ? 0 : 1);
 }
 close($notify);
+# Run the callback only after the child has acquired the report lock.
 read($ready, my $signal, 1) == 1 or die "Lock fixture failed\n";
 close($ready);
 my $result = eval { $code->() };
@@ -105,12 +108,14 @@ my @st = stat($log);
 is($st[4], $owner[2], 'created log belongs to the domain owner');
 is($st[2] & 07777, 0660, 'created log is shared with the web server');
 if (&virtual_server::domain_has_website($d) eq 'web') {
+    # Compare Apache log ownership with its configured service account.
     my @web = getpwnam(&virtual_server::get_apache_user($d));
     is($st[5], $web[3], 'created log uses the web server group');
 }
 is($status->{general}->{valid_requests}, 0, 'empty website gets a valid report');
 like(GoAccess::Report::read_regular("$dir/report.html", 1024*1024), qr/No traffic yet/, 'empty report explains its state');
 is(&log_data($d, &load_settings($d)), 0, 'empty logs offer nothing to report');
+# Include current, rotated and compressed requests in the next update.
 write_log($log, entry('21', '192.0.2.10', '/first?private=value').entry('21', '198.51.100.12', '/missing', 404));
 write_log("$log.1", entry('20', '203.0.113.15', '/previous'));
 my $archived = entry('19', '192.0.2.30', '/archive');
@@ -133,6 +138,7 @@ like($html, qr/GoAccess/, 'GoAccess dashboard generated');
 unlike($html, qr/private=value/, 'query strings removed from the dashboard');
 unlike($html, qr/192\.0\.2\.10/, 'client IP address anonymized');
 is((stat($dir))[2] & 0777, 0700, 'domain state is private');
+# Re-reading the same files must not accumulate duplicate statistics.
 $status = &generate_report($d);
 is($status->{general}->{valid_requests}, 4, 'repeat generation does not double count');
 $html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
@@ -142,6 +148,7 @@ $html = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
     eval { &generate_report($d); };
     like($@, qr/being updated/, 'concurrent updates fail clearly');
 });
+# A sleeping executable exercises timeout cleanup without changing GoAccess.
 my $slow = "$d->{home}/goaccess-slow-test";
 write_log($slow, "#!/bin/sh\nexec /bin/sleep 30\n");
 chmod(0750, $slow);
@@ -156,6 +163,7 @@ unlink($slow);
 
 # A real cron wrapper must produce the same report and exit successfully.
 is(system($cron_cmd, '--domain', $d->{'id'}), 0, 'cron wrapper runs with Webmin configuration');
+# Check date filtering and rotation settings independently.
 my $s = &load_settings($d);
 $s->{keep_days} = 1;
 &domain_lock($d, sub { &save_settings($d, $s); });
@@ -174,6 +182,7 @@ eval { &generate_report($d); };
 like($@, qr/GoAccess|format|parsed/i, 'parser failure reaches the caller');
 is(sha256_hex(GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024)), sha256_hex($html), 'failed update preserves prior HTML');
 ok(&report_status($d)->{error}, 'failed attempt recorded');
+# A successful retry replaces the failure status.
 write_log($log, entry('21', '192.0.2.10', '/recovered'));
 $status = &generate_report($d);
 ok(!$status->{error}, 'successful retry clears prior error');
@@ -196,11 +205,13 @@ is(&generate_report($d)->{general}->{valid_requests}, 1, 'custom log format supp
     ok(&allowed_domain($d->{'id'}, 'generate'), 'generation permission honored');
     ok(!&allowed_domain($d->{'id'}, 'configure'), 'report configuration denied without permission');
     {
+        # Revoking update permission must leave read access intact.
         local $access{generate} = 0;
         ok(!&allowed_domain($d->{'id'}, 'generate'), 'report generation denied without permission');
         ok(&allowed_domain($d->{'id'}), 'generation restriction retains report viewing');
     }
     {
+        # Apply owner restrictions immediately, before ACL regeneration.
         local $access{configure} = 1;
         local $access{noconfig} = 1;
         local $config{noedit} = 1;
@@ -254,6 +265,7 @@ ok(during_update(sub { &feature_backup($d, $backup, {}, {}) }, 'Backup'), 'Virtu
     ok(!&feature_backup($d, $backup, {}, {}), 'backup reports a failed final write');
 }
 my $before = GoAccess::Report::read_regular("$dir/report.html", 32*1024*1024);
+# Replace saved choices, then verify that restore recovers the backup.
 $s->{max_items} = 50;
 $s->{schedule} = 'manual';
 &state_lock($d, sub { &save_settings($d, $s); &sync_cron($d, $s); });
@@ -304,6 +316,7 @@ $filtered_settings->{schedule} = 'manual';
     &save_settings($d, $filtered_settings);
     &sync_cron($d, $filtered_settings);
 });
+# Include the domain, its www alias and one request for ASN lookup.
 my $local_request = entry('21', '81.2.69.142', '/local');
 $local_request =~ s/"-"/"https:\/\/$d->{dom}\/"/;
 my $alias_request = entry('21', '81.2.69.142', '/alias');
@@ -336,6 +349,7 @@ SKIP: {
     $data = report_data();
     like(encode_json($data->{hosts}), qr/London/, 'City setting takes precedence over Country');
     like(encode_json($data->{asn}), qr/Google/, 'ASN setting reaches the report worker');
+    # Clearing City must make the Country database active again.
     $config{geoip_city} = '';
     $config{geoip_country} = "$databases/GeoIP2-Country-Test.mmdb";
     &generate_report($d);
@@ -351,6 +365,7 @@ SKIP: {
     &generate_report($d);
     $data = report_data();
     ok(exists($data->{asn}) && !exists($data->{geolocation}), 'location panel omitted with only an ASN database');
+    # Failed database checks must leave the published HTML intact.
     $config{geoip_country} = "$databases/missing.mmdb";
     like(&check_goaccess($d, 1), qr/GeoIP database is not a readable file/,
         'GeoIP setup error is available before report generation');

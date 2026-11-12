@@ -20,6 +20,7 @@ require './virtualmin-goaccess-lib.pl';
 require './virtual_feature.pl';
 &virtual_server::set_all_null_print();
 my $name = shift(@ARGV) || '';
+# Refuse ordinary domains before replacing feature state and access logs.
 die "A disposable fixture domain is required\n"
     unless $name =~ /\Aga-test-[a-f0-9]+\.example\.test\z/;
 my $d = &virtual_server::get_domain_by('dom', $name) or die "Fixture not found\n";
@@ -59,6 +60,7 @@ if (!$pid) {
     do "$root/goaccess.pl";
     _exit(255);
 }
+# Partial filtering is a saved warning, not a cron failure or mail trigger.
 waitpid($pid, 0);
 is($?, 0, 'scheduled report succeeds with many aliases');
 is(-s "$tmp/stdout", 0, 'scheduled success writes no standard output');

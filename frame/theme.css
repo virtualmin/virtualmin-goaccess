@@ -75,15 +75,14 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 #overall li.blue div::before { background: var(--ui-info, #3b82f6); }
 #overall li.green div::before { background: var(--ui-success, #229f75); }
 
-/* GoAccess 1.7 uses grid modules and div.wrap-panel instead of the newer
- * #overall tiles and article panels. Keep both markup versions themed. */
+/* Theme both grid-module/div.wrap-panel and #overall/article markup. */
 .wrap-general .grid-module.black { border-top: 4px solid var(--ga-fg); }
 .wrap-general .grid-module.gray { border-top: 4px solid var(--ui-neutral-line, #cbd5e1); }
 .wrap-general .grid-module.red { border-top: 4px solid var(--ui-danger, #ff303e); }
 .wrap-general .grid-module.blue { border-top: 4px solid var(--ui-info, #3b82f6); }
 .wrap-general .grid-module.green { border-top: 4px solid var(--ui-success, #229f75); }
 
-/* Panels */
+/* Match panel surfaces and borders to the parent theme. */
 :is(article, div.wrap-panel) > div {
 	background: var(--ga-panel);
 	border: 1px solid var(--ga-border);
@@ -91,7 +90,7 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 	box-shadow: none;
 }
 
-/* Tables */
+/* Separate table rows and summaries with the theme's borders and tints. */
 .table > thead > tr > th, .table > tbody > tr > td, .table > tbody > tr > th,
 .table > tfoot > tr > td, .table > tfoot > tr > th,
 .table-responsive { border-color: var(--ga-border); }
@@ -290,11 +289,11 @@ nav li .toggle-panel.active i { color: var(--ga-accent); }
 }
 .clickable:hover, .expandable > td:hover, nav li:hover { background: var(--ga-accent-soft); }
 
-/* The report follows the Webmin theme, so GoAccess's own theme choice is hidden */
+/* Hide GoAccess's theme choice because the report follows Webmin's theme. */
 nav .nav-list h3:has(+ ul li a[class^="theme-"]),
 nav .nav-list ul:has(> li > a[class^="theme-"]) { display: none !important; }
 
-/* Charts */
+/* Keep chart labels, axes and data series readable in either color scheme. */
 .axis path { stroke: var(--ga-line-strong); }
 .grid.y .tick line, .grid.x .tick line { stroke: var(--ga-line); }
 .axis.x .tick line, .axis.y0 .tick line, .axis.y1 .tick line,
@@ -328,7 +327,7 @@ line.indicator { stroke: var(--ga-line-strong); }
 .chart-tooltip .blue { background-color: var(--ga-hits); }
 .chart-tooltip .red { background-color: var(--ga-visitors); }
 
-/* Maps */
+/* Match map backgrounds, country shapes and labels to the theme. */
 .chart-wrap.map-fullscreen { background: var(--ga-bg); }
 .country {
 	fill: var(--ui-neutral-soft, #cccccc);
@@ -338,7 +337,7 @@ line.indicator { stroke: var(--ga-line-strong); }
 .graticule { stroke: var(--ga-line); }
 .legend-svg text { fill: var(--ga-fg); }
 
-/* Scrollbars */
+/* Keep scrollbar tracks and thumbs visible in either color scheme. */
 ::-webkit-scrollbar-track, .table-responsive::-webkit-scrollbar-track,
 ::-webkit-scrollbar, .table-responsive::-webkit-scrollbar {
 	background-color: var(--ga-panel-2);

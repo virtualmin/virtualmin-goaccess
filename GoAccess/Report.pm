@@ -26,6 +26,7 @@ sub validate
 my ($input) = @_;
 die "Invalid report settings\n" unless ref($input) eq 'HASH';
 my $s = defaults();
+# Copy supported scalar settings and keep defaults for missing fields.
 foreach my $k (keys %$s) {
     next unless exists $input->{$k};
     die "Invalid value for $k\n" if !defined($input->{$k}) || ref($input->{$k});
@@ -120,6 +121,7 @@ foreach my $path (@$paths) {
         $remaining -= $n unless $compressed;
     }
     die "Cannot decompress $path: $GunzipError\n" if $compressed && $stream->error();
+    # Separate the next file from a log that has no final newline.
     print {$out} "\n" if length($last) && $last ne "\n";
     close($in);
     $count++;
@@ -140,13 +142,14 @@ $s =~ s/'/&#39;/g;
 return $s;
 }
 
-# local_referrers(hostnames, [warnings]) builds filters and reports omissions.
-# Ignore server-name expressions that are not DNS names or wildcard subdomains.
+# local_referrers(hostnames, [warnings]) returns hostname and port filters.
+# Append any coverage warning to the optional warnings array.
 sub local_referrers
 {
 my ($hostnames, $warnings) = @_;
 my (%seen, @filters);
 foreach my $name (@$hostnames) {
+    # Ignore duplicate names and unsupported server-name expressions.
     my $host = lc($name);
     $host =~ s/:\d+\z//;
     next unless $host =~ /\A(?:\*\.)?[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.?\z/;
@@ -165,9 +168,10 @@ if (@filters > 64) {
 return \@filters;
 }
 
-# command(binary, settings, title, [databases], [hostnames], [panels], [warnings]) builds
-# one run. Database paths and omitted panels come from module configuration,
-# not domain-owner input.
+# command(binary, settings, title, [databases], [hostnames], [panels],
+#         [warnings])
+# builds parser arguments from validated settings. Optional lists default to
+# empty. Database paths and omitted panels are controlled by the administrator.
 sub command
 {
 my ($binary, $s, $title, $databases, $hostnames, $panels, $warnings) = @_;
@@ -189,6 +193,7 @@ else {
     # GoAccess expands the selected built-in format itself.
     push @cmd, '--log-format='.$s->{format};
 }
+# Apply the requested date range, privacy settings and crawler filter.
 push @cmd, '--keep-last='.$s->{keep_days} if $s->{keep_days};
 push @cmd, '--anonymize-ip' if $s->{anonymize};
 push @cmd, '--no-query-string' if $s->{no_query};
@@ -232,6 +237,7 @@ print {$fh} '<!doctype html><html lang="en"><head><meta charset="utf-8">'.
     "<main><h1>$escaped</h1><h2>No traffic yet</h2>".
     '<p>The access logs are empty. Statistics will appear after your website receives requests and the report updates.</p></main></body></html>';
 close($fh) or die "Cannot save empty report: $!\n";
+# Keep the summary consistent with the empty HTML report.
 open($fh, '>', 'report.json') or die "Cannot create report data: $!\n";
 print {$fh} encode_json({general => {total_requests => 0, valid_requests => 0,
     failed_requests => 0, unique_visitors => 0, bandwidth => 0}});
@@ -247,6 +253,7 @@ sysopen(my $fh, $path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
     or die "Cannot read $path: $!\n";
 my @st = stat($fh);
 die "Invalid report file: $path\n" unless @st && S_ISREG($st[2]) && $st[3] == 1 && $st[7] <= $limit;
+# Enforce the limit during reading too, in case the file grows.
 my $data = '';
 while (1) {
     my $n = read($fh, my $buf, 65536);
@@ -259,7 +266,7 @@ close($fh);
 return $data;
 }
 
-# check_geoip(binary, databases, uid, gid) tests GeoIP with one synthetic request.
+# check_geoip(binary, databases, uid, gid) tests GeoIP with a synthetic request.
 # The normal worker enforces the account's permissions and a short time limit.
 # No website logs or published reports are read or changed.
 sub check_geoip
@@ -269,18 +276,21 @@ return unless @$databases;
 my $work = tempdir('virtualmin-goaccess-check-XXXXXXXX', TMPDIR => 1);
 my $error;
 eval {
+    # Let the unprivileged worker read this synthetic log.
     chmod(0755, $work) or die "Cannot open GeoIP check directory: $!\n";
     open(my $log, '>', "$work/access.log") or die "Cannot create GeoIP check log: $!\n";
     print {$log} '192.0.2.1 - - [01/Jan/2026:00:00:00 +0000] '.
         '"GET / HTTP/1.1" 200 1 "-" "GeoIP check"'."\n";
     close($log) or die "Cannot save GeoIP check log: $!\n";
     chmod(0644, "$work/access.log") or die "Cannot open GeoIP check log: $!\n";
+    # Use the same database checks and parser as a real report.
     generate({binary => $binary, settings => {rotated => 0},
         title => 'GeoIP setup check', log => "$work/access.log",
         uid => $uid, gid => $gid, timeout => 10, max_logs => 1,
         geoip_databases => $databases});
 };
 $error = $@;
+# Remove test files before returning or reporting a failure.
 remove_tree($work, {safe => 1});
 die "GeoIP setup check failed: $error" if $error;
 }
@@ -297,6 +307,7 @@ my $s = validate($o->{settings});
 my @warnings;
 my @cmd = command($o->{binary}, $s, $o->{title}, $o->{geoip_databases},
                   $o->{hostnames}, $o->{ignore_panels}, \@warnings);
+# Reject unsafe identities and limits before creating the worker.
 die "Invalid GoAccess executable\n" unless $o->{binary} =~ m{\A/} && -x $o->{binary};
 foreach my $k (qw(uid gid timeout max_logs)) {
     die "Invalid $k\n" unless defined($o->{$k}) && $o->{$k} =~ /\A\d+\z/;
@@ -318,22 +329,22 @@ eval {
     $pid = fork();
     die "Cannot start report worker: $!\n" unless defined($pid);
     if (!$pid) {
+        # Collect logs and run GoAccess in the isolated child process.
         eval {
-            # Webmin's in-process CGI runner ties standard handles to HTTP.
-            # The worker must detach them before redirecting or executing tools.
-            # The runner keeps its own reference to each tied handle, so
-            # Perl's untie warning is expected and must not fill Webmin's log.
+            # Detach Webmin's HTTP handles before redirecting output.
+            # Webmin retains references, so suppress the expected untie warning.
             no warnings 'untie';
             untie(*STDIN);
             untie(*STDOUT);
             untie(*STDERR);
+            # A separate process group lets the parent kill timed-out children.
             setpgid(0, 0) == 0 or die "Cannot isolate report worker: $!\n";
             chdir($stage) or die "Cannot enter work directory: $!\n";
             open(STDIN, '<', '/dev/null') or die "Cannot redirect input: $!\n";
             open(STDOUT, '>&', $diagnostics) or die "Cannot redirect output: $!\n";
             open(STDERR, '>&', $diagnostics) or die "Cannot redirect errors: $!\n";
 
-            # Clear inherited Webmin and loader settings before parsing log data.
+            # Clear inherited Webmin and loader settings before parsing.
             %ENV = (PATH => '/usr/bin:/bin', LC_ALL => 'C', HOME => '.');
             umask(0077);
             if ($> == 0) {
@@ -360,6 +371,7 @@ eval {
                 die "GeoIP database is not a readable file for the domain owner: $path\n"
                     unless -f $path && -r $path;
             }
+            # Save input counts so callers can distinguish empty logs.
             my $info = collect_logs($logs, 'input.log');
             open(my $meta, '>', 'input.json') or die "Cannot create input metadata: $!\n";
             print {$meta} encode_json($info);
@@ -375,7 +387,7 @@ eval {
             }
         };
         if ($@) {
-            # Exit without inherited Webmin cleanup handlers in the forked worker.
+            # Report failure without running Webmin's cleanup handlers.
             my $err = $@;
             syswrite($diagnostics, $err, length($err));
             _exit(1);
@@ -383,22 +395,25 @@ eval {
         _exit(0);
     }
 
-    # Kill the process group on timeout, including any running parser child.
+    # Wait for completion; timeout errors trigger process-group cleanup below.
     my $deadline = time() + $o->{timeout};
     my $status;
     while (1) {
         my $wait = waitpid($pid, WNOHANG);
+        # Save the worker's exit status before any other child is reaped.
         if ($wait == $pid) { $status = $?; last; }
         die "Cannot wait for report worker: $!\n" if $wait < 0;
         die "Report generation timed out after $o->{timeout} seconds\n" if time() >= $deadline;
         sleep(0.1);
     }
     $pid = undef;
+    # Return a bounded diagnostic message if the worker failed.
     seek($diagnostics, 0, 0);
     read($diagnostics, my $output, 16384);
     close($diagnostics);
     die ($output || "Report generation failed (status $status)\n") if $status;
 
+    # Validate worker output before handing it to the publisher.
     my $html = read_regular("$stage/report.html", 256*1024*1024);
     die "GoAccess did not create an HTML report\n" unless $html =~ /<!doctype html|<html/i;
     my $json = decode_json(read_regular("$stage/report.json", 64*1024*1024));
@@ -409,7 +424,7 @@ eval {
 };
 $error = $@;
 if ($pid) {
-    # An exception before reaping must not leave the parser running after failure.
+    # Stop the worker and parser if an error interrupted the wait.
     kill('KILL', -$pid);
     kill('KILL', $pid);
     waitpid($pid, 0);

@@ -20,6 +20,7 @@ chmod(0755, $tmp) or die $!;
 my $log = "$tmp/access.log";
 
 # entry(path, status, referrer, [ip]) creates a combined-format request.
+# The default IP, 81.2.69.142, has location data in the MMDB fixtures.
 sub entry
 {
 my ($path, $status, $referrer, $ip) = @_;
@@ -63,6 +64,7 @@ my ($data, $panel) = @_;
 return [map { $_->{data} } @{$data->{$panel}->{data} || []}];
 }
 
+# Filter local referrers without hiding similar external hostnames.
 my $hidden = report_data(\%options);
 is($hidden->{general}->{valid_requests}, 10, 'hiding local referrers preserves requests');
 is_deeply([sort @{rows($hidden, 'referring_sites')}],
@@ -70,6 +72,7 @@ is_deeply([sort @{rows($hidden, 'referring_sites')}],
 is_deeply([sort @{rows($hidden, 'referrers')}],
     ['-', 'https://example.test.evil.test/page', 'https://notexample.test/page'],
     'local URLs and ports are hidden without hiding similar external names');
+# Missing URLs belong in the error panel, including mixed-status URLs.
 ok(!grep($_ eq '/missing', @{rows($hidden, 'requests')}), '404 excluded from requested files');
 ok(!grep($_ eq '/missing.css', @{rows($hidden, 'static_requests')}),
     'static 404 excluded from static requests');
@@ -77,6 +80,7 @@ is_deeply([sort @{rows($hidden, 'not_found')}],
     ['/missing', '/missing.css', '/mixed'], '404 requests remain in the error panel');
 my ($mixed) = grep { $_->{data} eq '/mixed' } @{$hidden->{requests}->{data}};
 is($mixed->{hits}->{count}, 1, 'mixed-status URL counts only its non-404 request');
+# Turning the filter off restores referrers without changing traffic totals.
 $options{settings}->{hide_local_referrers} = 0;
 my $shown = report_data(\%options);
 is(scalar(@{rows($shown, 'referring_sites')}), 6, 'disabled filter restores local referrers');
@@ -103,6 +107,7 @@ is($@, '', 'valid City and ASN databases pass the setup check');
 eval { GoAccess::Report::check_geoip($binary,
     ["$databases/GeoIP2-Country-Test.mmdb"], $uid, $gid); };
 is($@, '', 'valid Country database passes the setup check');
+# Missing or corrupt databases must fail before settings can be accepted.
 open($fh, '>', "$tmp/broken.mmdb") or die $!;
 print {$fh} 'not a MaxMind database';
 close($fh);
@@ -121,6 +126,7 @@ chmod(0755, "$tmp/no-geoip");
 eval { GoAccess::Report::check_geoip("$tmp/no-geoip",
     ["$databases/GeoIP2-City-Test.mmdb"], $uid, $gid); };
 like($@, qr/GoAccess must be built with GeoIP2 support/, 'unsupported build has a clear setup error');
+# MMDB support alone is insufficient when the parser version is too old.
 open($fh, '>', "$tmp/no-geoip") or die $!;
 print {$fh} "#!/bin/sh\necho 'GoAccess - 1.6. --enable-geoip=mmdb'\n";
 close($fh);
@@ -155,6 +161,7 @@ $options{ignore_panels} = ['ASN'];
 $geo = report_data(\%options);
 ok(exists($geo->{geolocation}) && !exists($geo->{asn}), 'panel without a database can be omitted');
 delete($options{ignore_panels});
+# Generation and setup must both check database access as the domain owner.
 $options{geoip_databases} = ["$tmp/missing.mmdb"];
 eval { GoAccess::Report::generate(\%options); };
 like($@, qr/GeoIP database is not a readable file/, 'missing database has an actionable error');

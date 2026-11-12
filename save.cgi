@@ -7,6 +7,7 @@ require './virtualmin-goaccess-lib.pl';
 &ReadParse();
 &require_post();
 my $d = &require_domain($in{'dom'}, 'configure');
+# Validate first, then save the schedule and settings under one lock.
 eval {
     my $s = &settings_input(\%in);
     &state_lock($d, sub {
@@ -15,6 +16,7 @@ eval {
         &save_settings($d, $s);
     });
 };
+# Record the action only after both changes succeed.
 &error(&html_escape($@)) if $@;
 &webmin_log('save', 'domain', $d->{'dom'}, { 'id' => $d->{'id'} });
 &redirect('view.cgi?dom='.$d->{'id'});

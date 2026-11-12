@@ -21,6 +21,7 @@ use GoAccess::Report;
     like($output, qr/root command-line use only/, 'cron entry point rejects HTTP context');
 }
 
+# Defaults and validation must exclude caller-supplied executable paths.
 my $settings = GoAccess::Report::defaults();
 is($settings->{format}, 'COMBINED', 'combined log format by default');
 ok($settings->{anonymize} && $settings->{no_query}, 'privacy options on by default');
@@ -36,6 +37,7 @@ foreach my $invalid ({format => 'unknown'}, {schedule => '* * * * *'},
     eval { GoAccess::Report::validate($invalid); };
     ok($@, 'invalid settings rejected: '.join(', ', keys %$invalid));
 }
+# Custom formats remain one argument, and titles are safe to embed in HTML.
 my $custom = GoAccess::Report::validate({format => 'CUSTOM', custom_format => '%h %d %t %r %s %b'});
 my @cmd = GoAccess::Report::command('/usr/bin/goaccess', $custom, 'Example & site');
 ok(grep($_ eq '--log-format=%h %d %t %r %s %b', @cmd), 'custom format is one argument');
@@ -50,6 +52,7 @@ ok(grep(/\A--html-prefs=.*"theme":"bright"/, @cmd), 'downloads default to the br
 ok(grep($_ eq '--geoip-database=/srv/GeoIP data/City.mmdb', @cmd),
     'database paths with spaces remain single arguments');
 is(scalar(grep(/^--geoip-database=/, @cmd)), 2, 'City and ASN databases passed together');
+# Local filters cover names and ports without discarding requests.
 ok(grep($_ eq '--hide-referrer=example.test', @cmd), 'local hostname hidden');
 ok(grep($_ eq '--hide-referrer=example.test:*', @cmd), 'explicit referrer ports hidden');
 is(scalar(grep($_ eq '--hide-referrer=example.test', @cmd)), 1, 'duplicate hostnames omitted');
@@ -61,6 +64,7 @@ ok(!exists($owner->{geoip_databases}) && !exists($owner->{hostnames}),
 @cmd = GoAccess::Report::command('/usr/bin/goaccess',
     GoAccess::Report::validate({hide_local_referrers => 0}), 'Example', [], ['example.test']);
 ok(!grep(/^--hide-referrer=/, @cmd), 'local referrers can be shown again');
+# Reject malformed database paths and unrelated panel names.
 foreach my $path ('relative.mmdb', "/db\n--option", "/db\x00", []) {
     eval { GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example', [$path]); };
     like($@, qr/GeoIP database paths/, 'invalid database path rejected');
@@ -70,6 +74,7 @@ foreach my $path ('relative.mmdb', "/db\n--option", "/db\x00", []) {
 ok(grep($_ eq '--ignore-panel=ASN', @cmd), 'panel without a database omitted');
 eval { GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example', [], [], ['VISITORS']); };
 like($@, qr/Invalid GeoIP panel/, 'only GeoIP panels can be omitted');
+# Each hostname needs two filters within GoAccess's 64-filter limit.
 my @warnings;
 my $filters = GoAccess::Report::local_referrers(
     [map { "host$_.test" } 1..32], \@warnings);
@@ -83,7 +88,7 @@ is($cmd[-1], '--hide-referrer=host32.test:*', 'truncation keeps hostname and por
 
 my $tmp = tempdir(CLEANUP => 1);
 
-# write_fixture(path, text) writes a small test log in the private test directory.
+# write_fixture(path, text) writes a test log in the temporary directory.
 sub write_fixture
 {
 my ($path, $text) = @_;
@@ -92,6 +97,7 @@ print {$fh} $text;
 close($fh) or die $!;
 }
 
+# Mix supported rotations with similarly named files that must be excluded.
 write_fixture("$tmp/access.log", "current\n");
 write_fixture("$tmp/access.log.1", 'previous');
 gzip(\"compressed\n", "$tmp/access.log.2.gz") or die $GzipError;
@@ -103,6 +109,7 @@ is(scalar(@$logs), 4, 'only recognized rotations included');
 is_deeply(GoAccess::Report::log_files("$tmp/access.log", 0, 10), ["$tmp/access.log"], 'rotations can be disabled');
 eval { GoAccess::Report::log_files("$tmp/access.log", 1, 2); };
 like($@, qr/Too many/, 'log limit enforced without silently truncating the report');
+# Combining logs must decompress archives and separate incomplete final lines.
 my $info = GoAccess::Report::collect_logs($logs, "$tmp/combined");
 is($info->{files}, 4, 'all recognized files read');
 my $joined = GoAccess::Report::read_regular("$tmp/combined", 4096);
@@ -117,6 +124,7 @@ is($info->{files}, 1, 'hard-linked logs counted once');
 write_fixture("$tmp/broken.gz", 'not a gzip stream');
 eval { GoAccess::Report::collect_logs(["$tmp/broken.gz"], "$tmp/failed"); };
 like($@, qr/decompress/, 'broken archive reported');
+# Output size limits apply before accepting parser results.
 eval { GoAccess::Report::read_regular("$tmp/combined", 2); };
 like($@, qr/Invalid report file/, 'oversized output rejected');
 

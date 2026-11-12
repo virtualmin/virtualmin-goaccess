@@ -5,6 +5,7 @@ use warnings;
 our (%text, %in);
 require './virtualmin-goaccess-lib.pl';
 require './report-ui.pl';
+# Check domain access before reading private report state.
 &ReadParse();
 my $d = &require_domain($in{'dom'});
 my ($status, $settings);
@@ -48,6 +49,7 @@ foreach my $warning (@warnings) {
 my $schedule = $text{$paused ? 'schedule_paused' : 'auto_'.$settings->{'schedule'}};
 my %card = ( 'title' => $text{'summary_title'}, 'desc' => $schedule );
 if ($exists) {
+    # Show the saved report with the actions this user may perform.
     my @actions;
     push(@actions, &report_generate_form($d)) if $can_generate;
     push(@actions, &ui_link_icon('report.cgi?dom='.$d->{'id'}.'&amp;download=1',
@@ -85,7 +87,7 @@ else {
             &report_error($text{'log_check_failed'}, $log_error, 'danger').$actions });
     }
     else {
-        # Only a successful log check can establish that the site has no traffic.
+        # Show the empty, paused or first-report message for this domain.
         print &ui_card({ 'body' => &ui_empty_state({
             'icon' => $icon,
             'title' => $text{$heading},

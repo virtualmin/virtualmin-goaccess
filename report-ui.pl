@@ -11,7 +11,7 @@ my ($d, $settings) = @_;
 return &text('format_'.lc($settings->{'format'}), &web_server_name($d));
 }
 
-# report_generate_form(domain, [first]) returns a POST form to update the report.
+# report_generate_form(domain, [first]) returns a POST form for report updates.
 # Set first for the initial report button, which has no icon.
 sub report_generate_form
 {
@@ -39,6 +39,7 @@ my ($d, $icon) = @_;
 return '' unless &foreign_available('logviewer');
 my $log = &virtual_server::get_website_log($d);
 return '' unless $log;
+# Administrators use file paths; owners use logs registered with logviewer.
 my $param = &virtual_server::master_admin() ? 'file' : 'extra';
 return &ui_link_icon('../logviewer/view_log.cgi?view=1&amp;nonavlinks=1&amp;'.
                      $param.'='.&urlize($log),

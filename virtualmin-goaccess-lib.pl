@@ -51,18 +51,21 @@ else {
         or die "Cannot create access log $log: $!\n";
     close($fh);
 }
-# Ownership follows the web server's own rules, or else the domain's group.
 my $web = &virtual_server::domain_has_website($d) || '';
 if ($web eq 'web') {
+    # Apply Apache's log ownership and permissions.
     &virtual_server::set_apache_log_permissions($d, $log);
 }
 elsif (&virtual_server::plugin_defined($web, 'set_nginx_log_permissions')) {
+    # Let the Nginx plugin choose the log ownership and permissions.
     &virtual_server::plugin_call($web, 'set_nginx_log_permissions', $d, $log);
 }
 elsif (&virtual_server::is_under_directory($d->{'home'}, $log)) {
+    # Change permissions within the home directory as the domain owner.
     &virtual_server::set_permissions_as_domain_user($d, 0660, $log);
 }
 else {
+    # Use the domain's owner and group when no server-specific helper exists.
     &set_ownership_permissions($d->{'uid'}, $d->{'gid'}, 0660, $log);
 }
 return 1;
@@ -125,7 +128,8 @@ die "Invalid domain ID\n" unless $d && $d->{'id'} =~ /\A\d+\z/;
 return &state_root()."/$d->{'id'}";
 }
 
-# domain_lock(domain, code, [wait]) locks report files; updates fail fast by default.
+# domain_lock(domain, code, [wait]) runs a callback under the report lock.
+# Pass the report directory to code. A busy lock fails unless wait is set.
 # Lock files outlive report directories so deletion cannot create a second lock.
 sub domain_lock
 {
@@ -135,6 +139,7 @@ sysopen(my $lock, "$dir.lock", O_RDWR | O_CREAT | O_NOFOLLOW, 0600)
     or die "Cannot open report lock: $!\n";
 flock($lock, LOCK_EX | ($wait ? 0 : LOCK_NB))
     or die "This report is being updated. Try again shortly.\n";
+# Release the lock before passing a callback error to the caller.
 my ($result, $err);
 eval { $result = $code->($dir); };
 $err = $@;
@@ -143,8 +148,8 @@ die $err if $err;
 return $result;
 }
 
-# state_lock(domain, code) waits for updates before changing or backing up state.
-# Take Virtualmin's domain lock before the report lock to match lifecycle callers.
+# state_lock(domain, code) locks state before calling code with its directory.
+# Take Virtualmin's domain lock first, matching the lifecycle hooks.
 # Generation only needs the report lock and never waits for the domain lock.
 sub state_lock
 {
@@ -167,7 +172,8 @@ return GoAccess::Report::defaults() unless -e $file;
 return GoAccess::Report::validate(decode_json(GoAccess::Report::read_regular($file, 16384)));
 }
 
-# save_settings(domain, settings) saves validated settings under the caller's lock.
+# save_settings(domain, settings) validates and saves settings.
+# The caller must hold the domain's report lock.
 sub save_settings
 {
 my ($d, $s) = @_;
@@ -178,7 +184,7 @@ make_path($dir, { mode => 0700 }) unless -d $dir;
 return $s;
 }
 
-# report_status(domain) reads the last successful report summary and latest error.
+# report_status(domain) reads the saved summary, warnings and latest error.
 sub report_status
 {
 my ($d) = @_;
@@ -187,7 +193,8 @@ return {} unless -e $file;
 return decode_json(GoAccess::Report::read_regular($file, 65536));
 }
 
-# allowed_domain(id, [permission]) checks Virtualmin scope and action permissions.
+# allowed_domain(id, [permission]) checks domain access and action permissions.
+# Omit permission for read access. Return the domain, or undef when denied.
 sub allowed_domain
 {
 my ($id, $permission) = @_;
@@ -230,6 +237,7 @@ return $text{'error_limits'} unless ($config{'timeout'} || '') =~ /\A\d+\z/
 my @databases = grep { defined($_) && length($_) }
     ($config{'geoip_city'} || $config{'geoip_country'}, $config{'geoip_asn'});
 if (@databases && $geoip) {
+    # Run optional database checks as a domain owner or the nobody account.
     # Save the executable before loading domain data can rebind module globals.
     my $binary = $config{'goaccess'};
     ($d) = grep { $_->{$module_name} && !$_->{'disabled'} }
@@ -253,7 +261,7 @@ my ($d) = @_;
 return "$cron_cmd --domain $d->{'id'}";
 }
 
-# find_cron_jobs(domain) returns this module's jobs without matching other tasks.
+# find_cron_jobs(domain) returns only this module's update jobs for the domain.
 # Jobs written by early versions with an escaped path are matched too, so a
 # schedule change replaces them instead of leaving a duplicate.
 sub find_cron_jobs
@@ -281,6 +289,7 @@ eval {
     &create_wrapper($cron_cmd, $module_name, 'goaccess.pl') unless $paused;
     # Suspended domains and manual schedules must not retain an active job.
     if (!$paused && !$d->{'disabled'} && $s->{'schedule'} ne 'manual') {
+        # Spread updates across stable time slots derived from domain IDs.
         my $slot = $d->{'id'} % 60;
         &cron::create_cron_job({ user => 'root', command => &cron_command($d),
             active => 1, mins => $slot,
@@ -299,6 +308,7 @@ sub generate_report
 {
 my ($d) = @_;
 return &domain_lock($d, sub {
+    # The lock callback receives the domain's private report directory.
     my ($dir) = @_;
     die $text{'error_disabled'}."\n" if $d->{'disabled'} || -e "$dir/paused";
     my $settings = &load_settings($d);
@@ -347,6 +357,7 @@ return &domain_lock($d, sub {
         $status->{'error'} = substr($err, 0, 16384);
         $status->{'attempted'} = time();
     }
+    # Save the latest outcome, then pass any failure to the caller.
     &write_file_contents("$dir/status.json", encode_json($status));
     die $err if $err;
     return $status;

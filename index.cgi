@@ -12,15 +12,17 @@ print &ui_alert(&html_escape($error), 'danger') if $error;
 my @domains = sort { $a->{'dom'} cmp $b->{'dom'} }
     grep { &allowed_domain($_->{'id'}) } &virtual_server::list_domains();
 if (@domains) {
+    # Show only reports the current user can access.
     print &ui_columns_start([$text{'domain'}, $text{'schedule'},
         $text{'updated'}, $text{'requests'}, $text{'status'}], '100%');
     foreach my $d (@domains) {
+        # Keep listing other domains when one saved report cannot be read.
         my ($settings, $status, $err);
         eval { $settings = &load_settings($d); $status = &report_status($d); };
         $err = $@;
         $status ||= {};
         my $summary = ref($status->{'general'}) eq 'HASH' ? $status->{'general'} : {};
-        # A restored status file may hold something other than a warning list.
+        # Count saved warnings only when the field is an array.
         my $warned = ref($status->{'warnings'}) eq 'ARRAY' && @{$status->{'warnings'}};
         # Unreadable state counts as a failure the administrator should see.
         my ($label, $kind) = $err || $status->{'error'} ? ('status_error', 'danger') :
@@ -38,6 +40,7 @@ if (@domains) {
     print &ui_columns_end();
 }
 else {
+    # Explain why there are no reports to list.
     print &ui_empty_state({ 'icon' => 'globe', 'title' => $text{'index_empty_title'},
                             'desc' => $text{'index_empty'} });
 }

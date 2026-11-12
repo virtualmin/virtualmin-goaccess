@@ -12,7 +12,7 @@ sub feature_name { return $text{'feat_name'}; }
 # feature_label([editing]) returns the label in domain creation and editing.
 sub feature_label { return $text{'feat_name'}; }
 
-# feature_hlink() selects the domain feature help page.
+# feature_hlink([editing]) returns the feature help name; editing is unused.
 sub feature_hlink { return 'label'; }
 
 # feature_losing(domain) explains what removing this feature deletes.
@@ -29,7 +29,7 @@ $err =~ s/\s+\z//;
 return &text('feat_failed', &html_escape($err));
 }
 
-# feature_check() checks the administrator's GoAccess installation and limits.
+# feature_check([plugins]) checks the executable and limits; plugins is unused.
 sub feature_check { return &check_goaccess(); }
 
 # feature_depends(domain, [old-domain]) requires a website and a Unix owner.
@@ -50,10 +50,11 @@ my ($parent, $alias, $subdomain) = @_;
 return $alias || $subdomain ? 0 : 1;
 }
 
-# feature_clash(domain, [field]) allows coexistence with existing statistics tools.
+# feature_clash(domain, [field]) allows other statistics tools to coexist.
 sub feature_clash { return undef; }
 
-# feature_import(domain-name, username, database) checks for existing settings.
+# feature_import(domain-name, [username], [database]) checks for saved settings.
+# The username and database arguments are unused.
 sub feature_import
 {
 my ($name) = @_;
@@ -151,7 +152,7 @@ my ($d) = @_;
 return 1;
 }
 
-# feature_webmin(domain, domains) grants access to reports owned by this account.
+# feature_webmin(domain, domains) grants this owner's report permissions.
 sub feature_webmin
 {
 my ($d, $domains) = @_;
@@ -182,9 +183,8 @@ return @links;
 # feature_backup_name() describes the contents in Virtualmin backup options.
 sub feature_backup_name { return $text{'feat_backup_name'}; }
 
-# feature_backup(domain, file, options, home-format, differential, as-owner)
-# saves settings and the report snapshot. The file is written as the domain
-# user, so backups that Virtualmin runs as the owner work too.
+# feature_backup(domain, file, [options, ...]) saves settings and report HTML.
+# Extra Virtualmin backup arguments are unused. Write as the domain owner.
 sub feature_backup
 {
 my ($d, $file) = @_;
@@ -213,14 +213,15 @@ my $ok = eval {
 return $ok ? 1 : 0;
 }
 
-# feature_restore(domain, file, options, all-options) validates and restores
-# settings and the saved report, then rebuilds the update schedule.
+# feature_restore(domain, file, [options], [all-options]) restores saved reports
+# and settings, then rebuilds the schedule. Both option arguments are unused.
 sub feature_restore
 {
 my ($d, $file) = @_;
 &$virtual_server::first_print($text{'feat_restore'});
 my $ok = eval {
     my $backup = decode_json(GoAccess::Report::read_regular($file, 512*1024*1024));
+    # Reject unsupported or oversized data before changing saved state.
     die "Unsupported GoAccess backup\n" unless ref($backup) eq 'HASH' && ($backup->{'version'} || 0) == 1;
     my $s = GoAccess::Report::validate($backup->{'settings'});
     die "Invalid report in backup\n" if exists($backup->{'report'}) &&
@@ -249,8 +250,7 @@ my $ok = eval {
 return $ok ? 1 : 0;
 }
 
-# feature_validate(domain) checks the executable, domain requirements,
-# settings and scheduled update job.
+# feature_validate(domain) checks the parser, GeoIP, settings and schedule.
 sub feature_validate
 {
 my ($d) = @_;

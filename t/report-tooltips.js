@@ -5,16 +5,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+// Capture browser events so each check can trigger them directly.
 const documentEvents = {}, windowEvents = {};
 const root = { clientWidth: 600 };
 let tooltips = [];
 const document = {
     documentElement: root,
+    // addEventListener(name, callback) captures delegated mouse handling.
     addEventListener: (name, callback) => { documentEvents[name] = callback; },
+    // querySelectorAll() returns the current replacement tooltip list.
     querySelectorAll: () => tooltips
 };
 const window = {
     parent: {},
+    // addEventListener(name, callback) captures the resize handler.
     addEventListener: (name, callback) => { windowEvents[name] = callback; }
 };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../frame/theme.js'), 'utf8'),
@@ -25,6 +29,7 @@ vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../frame/theme.js'), 'u
 function tooltip(origin, width) {
     return {
         style: { left: '0px' }, offsetWidth: width,
+        // getBoundingClientRect() adds the chart offset to the tooltip offset.
         getBoundingClientRect() {
             const left = origin + parseFloat(this.style.left);
             return { left, right: left + width, width };

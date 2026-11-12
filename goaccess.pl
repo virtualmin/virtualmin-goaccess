@@ -8,6 +8,7 @@ die "This program is for root command-line use only\n"
     if $< != 0 || $ENV{'REQUEST_METHOD'} || $ENV{'GATEWAY_INTERFACE'};
 require './virtualmin-goaccess-lib.pl';
 
+# Accept exactly one domain ID or an explicit batch request.
 my ($mode, $id) = @ARGV;
 die "Usage: goaccess.pl --domain ID | --all\n" unless
     (@ARGV == 1 && $mode eq '--all') ||
@@ -28,9 +29,11 @@ else {
 # Report failures to cron and continue updating other domains in a batch.
 my $failed = 0;
 foreach my $d (@domains) {
+    # A saved pause marker also blocks manually invoked cron commands.
     next if $d->{'disabled'} || -f (&domain_dir($d).'/paused');
     eval { &generate_report($d); };
     if ($@) {
+        # Let cron report this domain's failure without stopping the batch.
         &error_stderr("$d->{'dom'}: $@");
         $failed = 1;
     }

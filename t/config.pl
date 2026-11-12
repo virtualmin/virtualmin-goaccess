@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# config.pl(webmin-root, [--live]) tests Webmin's OS config selection and upgrades.
+# config.pl(webmin-root, [--live]) tests OS config selection and upgrades.
 # The optional live check runs GoAccess as nobody on a disposable Linux VM.
 use strict;
 use warnings;
@@ -16,6 +16,7 @@ my ($webmin, $live) = @ARGV;
 die "Usage: config.pl /path/to/webmin [--live]\n"
     unless $webmin && -f "$webmin/copyconfig.pl" &&
            (!defined($live) || $live eq '--live');
+# Copy only module defaults into a temporary installer source tree.
 my $tmp = tempdir(CLEANUP => 1);
 my $module = 'virtualmin-goaccess';
 make_path("$tmp/source/$module");
@@ -98,12 +99,14 @@ if ($live) {
     ok(-x $config->{goaccess}, 'selected GoAccess executable is installed');
     my @owner = getpwnam('nobody');
     die "Missing nobody account\n" unless @owner;
+    # Make the temporary request readable by the unprivileged parser.
     chmod(0755, $tmp) or die $!;
     open(my $log, '>', "$tmp/access.log") or die $!;
     print {$log} '81.2.69.142 - - [12/Nov/2026:12:00:00 +0000] '.
         '"GET / HTTP/1.1" 200 123 "-" "Mozilla/5.0"'."\n";
     close($log) or die $!;
     chmod(0644, "$tmp/access.log") or die $!;
+    # Validate and use the databases selected by the installed OS defaults.
     my @databases = grep { length($_) }
         ($config->{geoip_city} || $config->{geoip_country}, $config->{geoip_asn});
     eval { GoAccess::Report::check_geoip($config->{goaccess}, \@databases,
@@ -115,6 +118,7 @@ if ($live) {
         timeout => 30, max_logs => 1, geoip_databases => \@databases,
         ignore_panels => @databases ? ['ASN'] : []});
     is($result->{general}->{valid_requests}, 1, 'default config generates a report');
+    # Check embedded report data rather than the rendered labels alone.
     my ($json) = $result->{html} =~ /var json_data\s*=\s*(\{.*)/s;
     die "Missing report data\n" unless $json;
     my ($data) = JSON::PP->new->decode_prefix($json);
