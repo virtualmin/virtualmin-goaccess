@@ -38,6 +38,11 @@ if ($status->{'error'}) {
                         $status->{'error'}, $exists ? 'warning' : 'danger',
                         $status->{'attempted'});
 }
+# Show saved report warnings. Ignore the field if it is not an array.
+my @warnings = ref($status->{'warnings'}) eq 'ARRAY' ? @{$status->{'warnings'}} : ();
+foreach my $warning (@warnings) {
+    print &ui_alert(&html_escape($warning), 'warning');
+}
 
 # Group report actions, the last update time and the schedule in one card.
 my $schedule = $text{$paused ? 'schedule_paused' : 'auto_'.$settings->{'schedule'}};

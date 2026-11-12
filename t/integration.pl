@@ -295,6 +295,7 @@ ok(-f "$dir/paused", 'missing state is recreated as paused');
 ok(&feature_delete($d), 'temporary paused state can be removed');
 ok(&feature_setup($d), 'feature can be enabled again after removal');
 
+# Verify live website names reach GoAccess and preserve internal page views.
 my $filtered_settings = GoAccess::Report::defaults();
 $filtered_settings->{rotated} = 0;
 $filtered_settings->{anonymize} = 0;
@@ -321,6 +322,7 @@ my ($data) = JSON::PP->new->decode_prefix($json);
 return $data;
 }
 my $data = report_data();
+is_deeply($data->{referring_sites}->{data}, [], 'domain and configured www alias are hidden');
 
 # Optional public MMDB fixtures exercise administrator configuration end to end.
 SKIP: {

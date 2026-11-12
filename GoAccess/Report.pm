@@ -17,7 +17,7 @@ sub defaults
 return { format => 'COMBINED', custom_format => '', date_format => '%d/%b/%Y',
          time_format => '%T', schedule => 'hourly', keep_days => 0,
          anonymize => 1, no_query => 1, ignore_crawlers => 0,
-         rotated => 1, max_items => 100 };
+         rotated => 1, max_items => 100, hide_local_referrers => 1 };
 }
 
 # validate(settings) returns supported settings with defaults, or dies.
@@ -35,7 +35,7 @@ foreach my $k (keys %$s) {
 # Fixed choices keep command options and cron expressions under module control.
 die "Invalid log format\n" unless $s->{format} =~ /\A(?:COMBINED|COMMON|VCOMBINED|CUSTOM)\z/;
 die "Invalid schedule\n" unless $s->{schedule} =~ /\A(?:hourly|daily|manual)\z/;
-foreach my $k (qw(anonymize no_query ignore_crawlers rotated)) {
+foreach my $k (qw(anonymize no_query ignore_crawlers rotated hide_local_referrers)) {
     die "Invalid value for $k\n" unless $s->{$k} =~ /\A[01]\z/;
 }
 die "Days to include must be between 0 and 3660\n"
@@ -140,6 +140,31 @@ $s =~ s/'/&#39;/g;
 return $s;
 }
 
+# local_referrers(hostnames, [warnings]) builds filters and reports omissions.
+# Ignore server-name expressions that are not DNS names or wildcard subdomains.
+sub local_referrers
+{
+my ($hostnames, $warnings) = @_;
+my (%seen, @filters);
+foreach my $name (@$hostnames) {
+    my $host = lc($name);
+    $host =~ s/:\d+\z//;
+    next unless $host =~ /\A(?:\*\.)?[a-z0-9_-]+(?:\.[a-z0-9_-]+)*\.?\z/;
+    next if $seen{$host}++;
+    # GoAccess includes an explicit port in the referring site's name.
+    push @filters, $host, "$host:*";
+}
+# Keep the report usable when GoAccess cannot hide every local hostname.
+if (@filters > 64) {
+    my $names = @filters / 2;
+    push @$warnings, "Local referrers are hidden for only 32 of $names website names. ".
+        "Referrers from the remaining names may appear. All requests still count."
+        if $warnings;
+    splice(@filters, 64);
+}
+return \@filters;
+}
+
 # command(binary, settings, title, [databases], [hostnames], [panels], [warnings]) builds
 # one run. Database paths and omitted panels come from module configuration,
 # not domain-owner input.
@@ -181,6 +206,11 @@ foreach my $panel (@{$panels || []}) {
     die "Invalid GeoIP panel\n"
         unless defined($panel) && !ref($panel) && $panel =~ /\A(?:GEO_LOCATION|ASN)\z/;
     push @cmd, '--ignore-panel='.$panel;
+}
+if ($s->{hide_local_referrers}) {
+    # Hiding the referrer preserves page views, visitors and bandwidth totals.
+    push @cmd, map { '--hide-referrer='.$_ }
+        @{local_referrers($hostnames || [], $warnings)};
 }
 return @cmd;
 }
@@ -375,7 +405,7 @@ eval {
     die "GoAccess did not create report statistics\n" unless ref($json->{general}) eq 'HASH';
     my $input = decode_json(read_regular("$stage/input.json", 4096));
     $result = { html => $html, general => $json->{general}, input => $input,
-                generated => int(time()), settings => $s };
+                generated => int(time()), settings => $s, warnings => \@warnings };
 };
 $error = $@;
 if ($pid) {

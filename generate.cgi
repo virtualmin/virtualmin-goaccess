@@ -12,7 +12,7 @@ my $log = &virtual_server::get_website_log($d) || $text{'log_missing'};
 &ui_print_unbuffered_header(&virtual_server::domain_in($d), $text{'generate'}, '', undef, 0, 1);
 print &text('gen_doing', &ui_tag('tt', &html_escape($d->{'dom'})),
             &ui_tag('tt', &html_escape($log))), &ui_br();
-eval { &generate_report($d); };
+my $result = eval { &generate_report($d); };
 my $err = $@;
 print &ui_tag_start('div', { 'id' => 'goaccess-result' });
 if ($err) {
@@ -24,6 +24,10 @@ if ($err) {
 else {
     &webmin_log('generate', 'domain', $d->{'dom'}, { 'id' => $d->{'id'} });
     print $text{'gen_done'};
+    foreach my $warning (@{$result->{'warnings'} || []}) {
+        # Successful updates can still have incomplete referrer filtering.
+        print &ui_alert(&html_escape($warning), 'warning');
+    }
     # The link to the report stands on its own line under the outcome.
     print &ui_tag('div', &ui_tag('a', &html_escape($text{'gen_view'}),
                                  { 'href' => 'view.cgi?dom='.$d->{'id'} }),

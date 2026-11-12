@@ -34,9 +34,10 @@ print &ui_table_row($text{'keep_days'}, &ui_select('keep_days', $s->{'keep_days'
     undef, undef, 1));
 print &ui_table_row($text{'max_items'}, &ui_select('max_items', $s->{'max_items'},
     [map { [$_, $_] } qw(10 25 50 100 250 500 1000)], undef, undef, 1));
-foreach my $key (qw(rotated anonymize no_query ignore_crawlers)) {
+foreach my $key (qw(rotated anonymize no_query ignore_crawlers hide_local_referrers)) {
     print &ui_table_row($text{$key}, &ui_yesno_radio($key, $s->{$key}));
 }
+print &ui_table_row('', &ui_note($text{'hide_local_referrers_notice'}, 0));
 print &ui_table_end();
 print &ui_submit($text{'save'});
 print &ui_form_end();

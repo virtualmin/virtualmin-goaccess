@@ -309,6 +309,10 @@ return &domain_lock($d, sub {
         # Loading a web-server plugin can rebind Webmin package globals.
         # Resolve the log before reading the module's configuration values.
         my $log = &virtual_server::get_website_log($d);
+        # The website's own names and aliases are the local referrers.
+        my @hostnames = ($d->{'dom'});
+        push(@hostnames, &virtual_server::get_website_hostnames($d))
+            if $settings->{'hide_local_referrers'};
         # Create a missing log so a new website can produce an empty report.
         &create_website_log($d, $log);
         my $err = &check_goaccess();
@@ -329,7 +333,7 @@ return &domain_lock($d, sub {
             settings => $settings, title => "$d->{'dom'} — Web statistics",
             log => $log, uid => $user[2], gid => $user[3],
             timeout => $config{'timeout'}, max_logs => $config{'max_logs'},
-            geoip_databases => \@databases,
+            geoip_databases => \@databases, hostnames => \@hostnames,
             ignore_panels => \@ignored});
         # Webmin writes a temporary file and renames it, so a failed write
         # leaves the previous report in place.

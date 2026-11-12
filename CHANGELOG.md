@@ -1,6 +1,8 @@
 #### Unreleased
 * Add module settings for GeoIP2 Country, City and ASN databases
 * Add a link from reports to the website's access-log search
+* Fix to keep reports working when local referrers exceed GoAccess's filter limit
+* Fix to hide local referrers by default while preserving traffic statistics
 
 #### Version 1.0.1
 * Add GoAccess reports for Apache and Nginx websites as a Virtualmin feature

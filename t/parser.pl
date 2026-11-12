@@ -63,6 +63,32 @@ my ($data, $panel) = @_;
 return [map { $_->{data} } @{$data->{$panel}->{data} || []}];
 }
 
+my $hidden = report_data(\%options);
+is($hidden->{general}->{valid_requests}, 10, 'hiding local referrers preserves requests');
+is_deeply([sort @{rows($hidden, 'referring_sites')}],
+    ['example.test.evil.test', 'notexample.test'], 'only external referring sites remain');
+is_deeply([sort @{rows($hidden, 'referrers')}],
+    ['-', 'https://example.test.evil.test/page', 'https://notexample.test/page'],
+    'local URLs and ports are hidden without hiding similar external names');
+$options{settings}->{hide_local_referrers} = 0;
+my $shown = report_data(\%options);
+is(scalar(@{rows($shown, 'referring_sites')}), 6, 'disabled filter restores local referrers');
+foreach my $metric (qw(valid_requests unique_visitors bandwidth)) {
+    is($hidden->{general}->{$metric}, $shown->{general}->{$metric},
+        "$metric unchanged by hiding local referrers");
+}
+
+# Exceeding the filter limit keeps all traffic and reports incomplete coverage.
+{
+    local $options{settings} = {rotated => 0};
+    local $options{hostnames} = ['example.test', map { "alias$_.test" } 1..39];
+    my $partial = GoAccess::Report::generate(\%options);
+    is($partial->{general}->{valid_requests}, 10, 'many aliases still produce a complete report');
+    like($partial->{warnings}->[0], qr/32 of 40/, 'successful report carries the filter warning');
+}
+my $complete = GoAccess::Report::generate(\%options);
+is_deeply($complete->{warnings}, [], 'disabled filtering does not carry a stale warning');
+
 # Setup checks use the actual parser without waiting for a scheduled report.
 eval { GoAccess::Report::check_geoip($binary,
     ["$databases/GeoIP2-City-Test.mmdb", "$databases/GeoLite2-ASN-Test.mmdb"], $uid, $gid); };

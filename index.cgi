@@ -20,9 +20,12 @@ if (@domains) {
         $err = $@;
         $status ||= {};
         my $summary = ref($status->{'general'}) eq 'HASH' ? $status->{'general'} : {};
+        # A restored status file may hold something other than a warning list.
+        my $warned = ref($status->{'warnings'}) eq 'ARRAY' && @{$status->{'warnings'}};
         # Unreadable state counts as a failure the administrator should see.
         my ($label, $kind) = $err || $status->{'error'} ? ('status_error', 'danger') :
             $d->{'disabled'} ? ('status_paused', 'neutral') :
+            $warned ? ('status_warning', 'warning') :
             $status->{'generated'} ? ('status_ready', 'success') : ('status_pending', 'info');
         print &ui_columns_row([
             &ui_tag('a', &html_escape($d->{'dom'}), { 'href' => 'view.cgi?dom='.$d->{'id'} }),

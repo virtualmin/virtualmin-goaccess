@@ -15,8 +15,15 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 
 def check_geoip_setup(request, domain_id, databases, state_dir):
+    """Exercise real module-config saves and visible warnings on a test VM.
+
+    request(path, form=None) sends GET or a form POST as the administrator.
+    Only call for a disposable fixture whose cron updates have been paused.
+    """
     config_path = Path('/etc/webmin/virtualmin-goaccess/config')
     saved_config = config_path.read_bytes()
+    status_path = Path(state_dir) / 'status.json'
+    saved_status = status_path.read_bytes()
     config = dict(line.split('=', 1) for line in saved_config.decode().splitlines() if '=' in line)
     assert domain_id.isdigit() and Path(state_dir).name == domain_id
     assert json.loads((Path(state_dir) / 'settings.json').read_text())['schedule'] == 'manual'
@@ -63,12 +70,27 @@ def check_geoip_setup(request, domain_id, databases, state_dir):
         assert calls.read_bytes() == b'', 'Viewing reports must not invoke GoAccess'
         config_path.write_bytes(accepted)
 
+        # Warnings must be visible and escaped without being treated as failures.
+        status = json.loads(saved_status)
+        warning = 'Local referrers are hidden for only 32 of 40 website names. <test>'
+        status['warnings'] = [warning]
+        status_path.write_text(json.dumps(status))
+        body, _, code = request('/virtualmin-goaccess/view.cgi?dom=' + domain_id)
+        assert code == 200 and b'32 of 40' in body and b'&lt;test&gt;' in body
+        assert b'id="goaccess-frame"' in body
+        body, _, code = request('/virtualmin-goaccess/')
+        assert code == 200 and b'Ready with warnings' in body
+        print('HTTP GeoIP saves, report viewing and warnings passed', flush=True)
     finally:
         config_path.write_bytes(saved_config)
+        status_path.write_bytes(saved_status)
 
 
 def check_report_controls(request, domain_id, admin=False):
+    """Check the report setting and follow its access-log search as this user."""
     view = '/virtualmin-goaccess/view.cgi?dom=' + domain_id
+    body, _, code = request('/virtualmin-goaccess/edit.cgi?dom=' + domain_id)
+    assert code == 200 and b'name="hide_local_referrers"' in body
     body, _, code = request(view)
     assert code == 200
     links = [unescape(link) for link in re.findall(r'href="([^"]+)"', body.decode())]

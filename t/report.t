@@ -30,7 +30,7 @@ ok(!exists($filtered->{binary}) && !exists($filtered->{output}), 'only supported
 
 # Invalid forms must fail before a parser or schedule is changed.
 foreach my $invalid ({format => 'unknown'}, {schedule => '* * * * *'},
-    {anonymize => 2}, {keep_days => -1},
+    {anonymize => 2}, {hide_local_referrers => 2}, {keep_days => -1},
     {keep_days => 3661}, {max_items => 9}, {max_items => 1001},
     {custom_format => "line\nline"}, {format => 'CUSTOM'}, {rotated => []}) {
     eval { GoAccess::Report::validate($invalid); };
@@ -50,9 +50,17 @@ ok(grep(/\A--html-prefs=.*"theme":"bright"/, @cmd), 'downloads default to the br
 ok(grep($_ eq '--geoip-database=/srv/GeoIP data/City.mmdb', @cmd),
     'database paths with spaces remain single arguments');
 is(scalar(grep(/^--geoip-database=/, @cmd)), 2, 'City and ASN databases passed together');
+ok(grep($_ eq '--hide-referrer=example.test', @cmd), 'local hostname hidden');
+ok(grep($_ eq '--hide-referrer=example.test:*', @cmd), 'explicit referrer ports hidden');
+is(scalar(grep($_ eq '--hide-referrer=example.test', @cmd)), 1, 'duplicate hostnames omitted');
+ok(grep($_ eq '--hide-referrer=*.sub.example.test', @cmd), 'wildcard website alias retained');
+ok(!grep(/^--ignore-(?:referrer|status)=/, @cmd), 'traffic and errors are not discarded');
 my $owner = GoAccess::Report::validate({geoip_databases => ['/private/db'], hostnames => ['*']});
 ok(!exists($owner->{geoip_databases}) && !exists($owner->{hostnames}),
     'owners cannot override database paths or website hostnames');
+@cmd = GoAccess::Report::command('/usr/bin/goaccess',
+    GoAccess::Report::validate({hide_local_referrers => 0}), 'Example', [], ['example.test']);
+ok(!grep(/^--hide-referrer=/, @cmd), 'local referrers can be shown again');
 foreach my $path ('relative.mmdb', "/db\n--option", "/db\x00", []) {
     eval { GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example', [$path]); };
     like($@, qr/GeoIP database paths/, 'invalid database path rejected');
@@ -62,6 +70,17 @@ foreach my $path ('relative.mmdb', "/db\n--option", "/db\x00", []) {
 ok(grep($_ eq '--ignore-panel=ASN', @cmd), 'panel without a database omitted');
 eval { GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example', [], [], ['VISITORS']); };
 like($@, qr/Invalid GeoIP panel/, 'only GeoIP panels can be omitted');
+my @warnings;
+my $filters = GoAccess::Report::local_referrers(
+    [map { "host$_.test" } 1..32], \@warnings);
+is(scalar(@$filters), 64, 'all names and ports fit at the filter limit');
+is_deeply(\@warnings, [], 'no warning when every name is covered');
+@cmd = GoAccess::Report::command('/usr/bin/goaccess', $settings, 'Example',
+    [], [map { "host$_.test" } 1..40], [], \@warnings);
+is(scalar(grep(/^--hide-referrer=/, @cmd)), 64, 'excess names do not stop command generation');
+like($warnings[0], qr/32 of 40/, 'partial filter coverage is reported');
+is($cmd[-1], '--hide-referrer=host32.test:*', 'truncation keeps hostname and port together');
+
 my $tmp = tempdir(CLEANUP => 1);
 
 # write_fixture(path, text) writes a small test log in the private test directory.

@@ -32,6 +32,15 @@ enable it for a virtual server. Open the report under
 **Logs and Reports → GoAccess Report**. Reports update on a schedule or on demand.
 Use **GoAccess Configuration** to set the log format, schedule and filters.
 
+Referrers from the website's own hostnames and configured aliases are hidden by
+default. Their requests still count toward page views, visitors and bandwidth.
+Disabling the filter includes local referrers again after the next report update.
+The filter covers the first 32 distinct DNS names or wildcard subdomains.
+GoAccess allows 64 referrer filters, and each name needs two to match referrers
+with and without an explicit port.
+Reports still update if the website has more names, but warn that some local
+referrers may appear.
+
 Users with permission to read the website's access log can search individual
 requests.
 
@@ -105,6 +114,23 @@ Pass the GoAccess executable and database directory:
 
 ```sh
 perl t/parser.pl /usr/bin/goaccess /tmp/geoip-test-databases
+```
+
+On a disposable Virtualmin test VM, run `t/usability.pl` as root from the
+installed module directory. Use an existing test domain named
+`ga-test-<lowercase hex digits>.example.test` with GoAccess reporting enabled.
+The default report schedule must be hourly or daily.
+
+This test replaces the domain's GoAccess settings, generated report and access
+log, and leaves report updates set to manual. It checks that GeoIP errors do not
+block setup and that successful scheduled updates do not send cron mail when
+some local referrers remain visible.
+
+Set `WEBMIN_CONFIG` and `WEBMIN_VAR` to Webmin's configuration and data directories:
+
+```sh
+WEBMIN_CONFIG=/etc/webmin WEBMIN_VAR=/var/webmin \
+  perl t/usability.pl ga-test-01234567.example.test
 ```
 
 ## License
