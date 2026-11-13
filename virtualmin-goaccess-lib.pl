@@ -333,7 +333,9 @@ return &domain_lock($d, sub {
 	die $text{'error_disabled'}."\n" if $d->{'disabled'} ||
 		-e "$dir/paused";
 	my $settings = &load_settings($d);
-	my $status = &report_status($d);
+	# A damaged summary must not block the update that replaces it.
+	my $status = eval { &report_status($d) };
+	$status = { } if ref($status) ne 'HASH';
 	my $result;
 	make_path($dir, { mode => 0700 }) unless -d $dir;
 	eval {
@@ -393,7 +395,14 @@ return &domain_lock($d, sub {
 		$status->{'attempted'} = time();
 		}
 	# Save the latest outcome, then pass any failure to the caller.
-	&write_file_contents("$dir/status.json", encode_json($status));
+	my $json = encode_json($status);
+	if (length($json) > 65536) {
+		# Save a short error that fits the summary reader's size limit.
+		$err ||= "The report summary is too large\n";
+		$json = encode_json({ 'error' => substr($err, 0, 8192),
+				      'attempted' => time() });
+		}
+	&write_file_contents("$dir/status.json", $json);
 	die $err if $err;
 	return $status;
 	});
