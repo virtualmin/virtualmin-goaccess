@@ -1,8 +1,15 @@
-#### Unreleased
+#### Version 1.1.0
 * Add module settings for GeoIP2 Country, City and ASN databases
 * Add a link from reports to the website's access-log search
+* Fix to use `/var/tmp` to reduce memory use during report generation
 * Fix to keep reports working when local referrers exceed GoAccess's filter limit
 * Fix to hide local referrers by default while preserving traffic statistics
+* Fix vertical report layouts to fill the available width
+* Fix report padding, header alignment, pagination and corner styles to follow the active theme
+* Fix report theme synchronization when stylesheets load, change or are removed
+* Fix report sandbox bypass during in-page navigation
+* Fix report worker isolation and user and group checks
+* Fix worker startup warnings and scheduled report error output
 
 #### Version 1.0.1
 * Add GoAccess reports for Apache and Nginx websites as a Virtualmin feature
