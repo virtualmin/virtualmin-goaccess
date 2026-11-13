@@ -372,7 +372,7 @@ eval {
 			untie(*STDERR);
 			# A separate process group lets the parent
 			# kill timed-out children.
-			setpgid(0, 0) == 0 or
+			setpgid(0, 0) or
 				die "Cannot isolate report worker: $!\n";
 			chdir($stage) or
 				die "Cannot enter work directory: $!\n";
@@ -392,10 +392,14 @@ eval {
 				# Drop supplementary groups as well as the root
 				# UID and GID.
 				$) = "$o->{gid} $o->{gid}";
-				POSIX::setgid($o->{gid}) == 0 or
+				POSIX::setgid($o->{gid}) or
 					die "Cannot set report group: $!\n";
-				POSIX::setuid($o->{uid}) == 0 or
+				POSIX::setuid($o->{uid}) or
 					die "Cannot set report user: $!\n";
+				# Verify that only the domain's group remains.
+				die "Incorrect report group\n"
+					if grep { $_ != $o->{gid} }
+						split(' ', "$( $)");
 				}
 			die "Incorrect report identity\n" if $> != $o->{uid} ||
 				$< != $o->{uid};
