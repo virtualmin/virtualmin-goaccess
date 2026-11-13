@@ -6,6 +6,13 @@ our (%in, %text);
 require './virtualmin-goaccess-lib.pl';
 &ReadParse();
 my $d = &require_domain($in{'dom'});
+# Block Ajax insertion, which bypasses the report's sandbox.
+if ($ENV{'HTTP_X_REQUESTED_WITH'}) {
+	# An empty response makes Authentic open the URL as a normal page.
+	print "Content-Type: text/html; charset=UTF-8\r\n";
+	print "Cache-Control: private, no-store\r\n\r\n";
+	exit;
+	}
 my $path = &domain_dir($d).'/report.html';
 my $html = eval { GoAccess::Report::read_regular($path, 256 * 1024 * 1024) };
 &error($text{'report_missing'}) if $@;
