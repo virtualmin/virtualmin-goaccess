@@ -345,7 +345,8 @@ die "Invalid generation limits\n" unless $o->{timeout} >= 1 &&
 die "Reports must run as a non-root domain user\n" if $o->{uid} == 0;
 my $logs = log_files($o->{log}, $s->{rotated}, $o->{max_logs});
 
-my $work = tempdir('virtualmin-goaccess-XXXXXXXX', TMPDIR => 1);
+# Keep large log snapshots out of /tmp, which may use memory.
+my $work = tempdir('virtualmin-goaccess-XXXXXXXX', DIR => '/var/tmp');
 my $stage = "$work/stage";
 my ($result, $error, $pid);
 eval {
