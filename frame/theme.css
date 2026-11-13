@@ -246,6 +246,8 @@ nav.active {
 	opacity: 1;
 	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.12);
 }
+/* Let the vertical layout fill the frame at every screen width. */
+.container { width: auto; }
 .container-fluid { margin-left: auto; }
 /* Compact menu and settings buttons pinned to the top right corner */
 nav .nav-bars, nav .nav-gears, nav .nav-ws-status {
