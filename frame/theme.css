@@ -18,7 +18,9 @@ html {
 	/* Derive chart lines from the text color to suit either palette. */
 	--ga-line: color-mix(in srgb, var(--ga-fg) 22%, transparent);
 	--ga-line-strong: color-mix(in srgb, var(--ga-fg) 40%, transparent);
-	--ga-radius: 4px;
+	--ga-gap: var(--ui-gap, 7px);
+	--ga-radius: var(--ui-radius, 0px);
+	--ga-nav-size: 29px;
 }
 
 /* Use the parent page's colors and fonts when available. */
@@ -59,6 +61,8 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 
 /* Overall statistics tiles, with the theme's state colors as their accents */
 #overall li div, .wrap-general .grid-module {
+	margin-top: var(--ga-gap);
+	padding: calc(var(--ga-gap) * 2);
 	background: var(--ga-panel);
 	color: var(--ga-fg);
 	border: 1px solid var(--ga-border);
@@ -84,6 +88,8 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 
 /* Match panel surfaces and borders to the parent theme. */
 :is(article, div.wrap-panel) > div {
+	margin-top: var(--ga-gap);
+	padding: calc(var(--ga-gap) * 2);
 	background: var(--ga-panel);
 	border: 1px solid var(--ga-border);
 	border-radius: var(--ga-radius);
@@ -175,7 +181,16 @@ a, .nav li a:hover, .nav li.active a, .nav li:hover a { color: var(--ga-accent);
 	background-color: var(--ga-panel);
 	border-color: var(--ga-border);
 	color: var(--ga-muted);
-	border-radius: var(--ga-radius);
+	border-radius: 0;
+}
+/* Round only the outside corners of joined pagination buttons. */
+.pagination > li:first-child > a {
+	border-top-left-radius: var(--ga-radius);
+	border-bottom-left-radius: var(--ga-radius);
+}
+.pagination > li:last-child > a {
+	border-top-right-radius: var(--ga-radius);
+	border-bottom-right-radius: var(--ga-radius);
 }
 .pagination > li > a:hover, .pagination > li > a:active, .pagination > li > a:focus {
 	color: var(--ga-accent);
@@ -249,16 +264,33 @@ nav.active {
 /* Let the vertical layout fill the frame at every screen width. */
 .container { width: auto; }
 .container-fluid { margin-left: auto; }
+/* Use the same gap around the report and between its grid columns. */
+.container, .container-fluid {
+	padding-left: var(--ga-gap);
+	padding-right: var(--ga-gap);
+}
+.row {
+	margin-left: calc(var(--ga-gap) / -2);
+	margin-right: calc(var(--ga-gap) / -2);
+}
+.row > [class*="col-"], .wrap-general-items .col-md-2 {
+	padding-left: calc(var(--ga-gap) / 2);
+	padding-right: calc(var(--ga-gap) / 2);
+}
 /* Compact menu and settings buttons pinned to the top right corner */
 nav .nav-bars, nav .nav-gears, nav .nav-ws-status {
 	position: fixed;
 	left: auto;
 }
 nav .nav-bars, nav .nav-gears {
-	top: 8px;
-	right: 8px;
-	width: 29px;
-	height: 29px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	top: var(--ga-gap);
+	right: var(--ga-gap);
+	width: var(--ga-nav-size);
+	height: var(--ga-nav-size);
+	margin: 0;
 	padding: 0;
 	font-size: 16px;
 	line-height: 1;
@@ -267,11 +299,24 @@ nav .nav-bars, nav .nav-gears {
 	background: var(--ga-panel-2);
 	transition: opacity .2s;
 }
-nav .nav-gears { top: 8px; right: 43px; }
-nav .nav-ws-status { top: 16px; right: 82px; }
-/* Leave room beside the first heading's date range for the two menu buttons. */
-#overall, .wrap-general { margin-top: 10px; }
-#overall hgroup p, .wrap-general > .gheader .pull-right { padding-right: 75px; }
+nav .nav-gears { right: calc(var(--ga-nav-size) + var(--ga-gap) * 2); }
+nav .nav-ws-status {
+	top: calc(8px + var(--ga-gap));
+	right: calc(64px + var(--ga-gap) * 3);
+}
+/* Align the summary heading and date range with the menu buttons. */
+#overall, .wrap-general { margin-top: var(--ga-gap); }
+#overall hgroup, .wrap-general > .gheader {
+	margin: 0;
+	min-height: var(--ga-nav-size);
+	line-height: var(--ga-nav-size);
+}
+#overall hgroup h2, #overall hgroup p { margin: 0; line-height: inherit; }
+/* Reserve room for both buttons, including in the compact heading. */
+#overall hgroup p, .wrap-general > .gheader .pull-right,
+.wrap-general > h5.gheader {
+	padding-right: calc(var(--ga-nav-size) * 2 + var(--ga-gap) * 2);
+}
 nav .nav-bars, nav .nav-gears { color: var(--ga-muted); }
 nav .nav-bars:hover, nav .nav-gears:hover, nav header a:hover { color: var(--ga-fg); }
 nav header a { color: var(--ga-fg); }

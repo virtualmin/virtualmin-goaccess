@@ -1,6 +1,6 @@
-// Match the frame's colors and fonts to Webmin, and size it to the report.
+// Match the frame's appearance to Webmin, and size it to the report.
 //
-// Read the widget stylesheet's --ui-* properties from .ui_page. Send them
+// Read the page's theme properties and resolve its spacing and radius. Send them
 // in the frame's URL fragment on load, then by postMessage when the theme
 // or stylesheet changes. The frame's opaque origin prevents direct DOM
 // access. frame/theme.js applies the palette and sends back the report height.
@@ -10,6 +10,7 @@
 	// Skip absent frames and copies of this script that already ran.
 	if (!frame || frame.getAttribute('src')) return;
 	var page = frame.closest('.ui_page') || document.body;
+	var card = frame.closest('.ui_card') || page;
 	var TOKENS = [ 'canvas', 'surface', 'surface-2', 'border', 'border-soft',
 		'border-strong', 'fg', 'fg-muted', 'accent', 'accent-soft', 'ring',
 		'success', 'success-text', 'success-soft', 'success-line',
@@ -23,9 +24,10 @@
 	// newest copy may watch the document.
 	if (window.goaccessFrameSync) window.goaccessFrameSync.stop();
 
-	// Resolve the surface color for the brightness check.
+	// Resolve theme colors and lengths before sending them into the frame.
 	var probe = document.createElement('span');
 	probe.hidden = true;
+	probe.style.marginLeft = 'var(--gap, var(--ui-gap, 7px))';
 	page.appendChild(probe);
 	// isDark(color) selects the frame's color scheme from the page surface.
 	function isDark(color) {
@@ -48,6 +50,11 @@
 				tokens['--ui-' + name] = value;
 			}
 		});
+		// Resolve calc() and inherited variables in the parent document.
+		var metrics = getComputedStyle(probe);
+		tokens['--ui-gap'] = metrics.marginLeft;
+		// Match the inner card, not the outer page's rounded container.
+		tokens['--ui-radius'] = getComputedStyle(card).borderTopLeftRadius;
 		var surface = tokens['--ui-surface'];
 		var message = { type: 'webmin-ui-palette', tokens: tokens,
 				scheme: surface && isDark(surface) ? 'dark' : 'light' };
@@ -76,6 +83,12 @@
 	var observer = new MutationObserver(function () {
 		requestAnimationFrame(function () { send(false); });
 	});
+	// onStylesheetLoad(event) refreshes tokens after a stylesheet is ready.
+	function onStylesheetLoad(event) {
+		if (event.target.matches && event.target.matches('link[rel~="stylesheet"]')) {
+			send(false);
+		}
+	}
 	// Hide the spinner on load or the first size message.
 	var loading = frame.parentElement &&
 		frame.parentElement.querySelector('.goaccess-frame-loading');
@@ -100,10 +113,11 @@
 		frame.style.height = Math.max(Math.ceil(height), 320) + 'px';
 	}
 	window.addEventListener('message', onFrameMessage);
-	// stop() removes this frame's document listeners and color probe.
+	// stop() removes this frame's document listeners and theme probe.
 	function stop() {
 		observer.disconnect();
 		window.removeEventListener('message', onFrameMessage);
+		document.removeEventListener('load', onStylesheetLoad, true);
 		probe.remove();
 		// Keep a newer instance's cleanup hook intact.
 		if (window.goaccessFrameSync && window.goaccessFrameSync.stop === stop) {
@@ -240,9 +254,9 @@
 		encodeURIComponent(JSON.stringify(initial));
 	observer.observe(document.documentElement, { attributes: true });
 	observer.observe(document.body, { attributes: true });
-	// On Ajax navigation the widget stylesheet may still be loading.
-	document.querySelectorAll('link[href*="ui-lib.css"]').forEach(function (link) {
-		link.addEventListener('load', function () { send(false); });
-	});
+	// Themes add, replace and remove stylesheets, including rounded corners.
+	observer.observe(document.head, { childList: true, subtree: true, attributes: true });
+	// Capture load events from existing and newly inserted stylesheets.
+	document.addEventListener('load', onStylesheetLoad, true);
 	refreshFonts();
 })();
