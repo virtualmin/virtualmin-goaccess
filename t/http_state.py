@@ -85,7 +85,7 @@ def check_geoip_setup(request, domain_id, databases, state_dir):
         assert code == 200 and b'32 of 40' in body and b'&lt;test&gt;' in body
         assert b'id="goaccess-frame"' in body
         body, _, code = request('/virtualmin-goaccess/')
-        assert code == 200 and b'Ready with warnings' in body
+        assert code == 200 and b'Available with warnings' in body
         print('HTTP GeoIP saves, report viewing and warnings passed', flush=True)
     finally:
         # Restore both files even if an HTTP assertion fails.

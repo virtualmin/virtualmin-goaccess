@@ -6,17 +6,16 @@ our %text;
 require './virtualmin-goaccess-lib.pl';
 
 &ui_print_header(undef, $text{'index_title'}, '', undef, 1, 1);
-print &ui_page_start({ 'id' => 'goaccess-index', 'class' => 'goaccess' });
 my $error = &check_goaccess();
 print &ui_alert(&html_escape($error), 'danger') if $error;
 my @domains = sort { $a->{'dom'} cmp $b->{'dom'} }
 	grep { &allowed_domain($_->{'id'}) } &virtual_server::list_domains();
 if (@domains) {
-	# Show only reports the current user can access.
+	# Let the theme sort and search reports the current user can access.
 	print &ui_columns_start(
 		[ $text{'domain'}, $text{'schedule'}, $text{'updated'},
 		  $text{'requests'}, $text{'status'} ],
-		'100%');
+		100, undef, undef, undef, 1);
 	foreach my $d (@domains) {
 		# Keep listing other domains when one saved report
 		# cannot be read.
@@ -30,33 +29,38 @@ if (@domains) {
 		my $summary = ref($status->{'general'}) eq 'HASH'
 			? $status->{'general'}
 			: { };
+		# Sort dates and counts numerically, including missing reports.
+		my $generated = ($status->{'generated'} || '') =~ /\A\d+\z/
+			? $status->{'generated'} : 0;
+		my $requests = $summary->{'valid_requests'} // '-';
+		my $request_order = $requests =~ /\A\d+\z/ ? $requests : -1;
 		# Count saved warnings only when the field is an array.
 		my $warned = ref($status->{'warnings'}) eq 'ARRAY' &&
 			@{$status->{'warnings'}};
 		# Unreadable state counts as a failure the
 		# administrator should see.
-		my ($label, $kind) = $err || $status->{'error'}
-			? ( 'status_error', 'danger' )
+		my $label = $err || $status->{'error'}
+			? 'status_error'
 			: $d->{'disabled'}
-				? ( 'status_paused', 'neutral' )
+				? 'status_paused'
 				: $warned
-					? ( 'status_warning', 'warning' )
+					? 'status_warning'
 					: $status->{'generated'}
-						? ( 'status_ready', 'success' )
-						: ( 'status_pending', 'info' );
+						? 'status_ready'
+						: 'status_pending';
 		print &ui_columns_row([
 			&ui_tag('a', &html_escape($d->{'dom'}),
 				{ 'href' => 'view.cgi?dom='.$d->{'id'} }),
 			&html_escape($settings
 				? $text{'schedule_'.$settings->{'schedule'}}
 				: '-'),
-			$status->{'generated'} &&
-			$status->{'generated'} =~ /\A\d+\z/
-				? &make_date($status->{'generated'})
+			$generated
+				? &make_date($generated)
 				: &html_escape($text{'never'}),
-			&html_escape($summary->{'valid_requests'} // '-'),
-			&ui_badge($text{$label}, $kind,
-				  { 'small' => 1, 'dot' => 1 }) ]);
+			&html_escape($requests),
+			&html_escape($text{$label}) ],
+			[ undef, undef, 'data-order="'.$generated.'"',
+			  'data-order="'.$request_order.'"' ]);
 		}
 	print &ui_columns_end();
 	}
@@ -67,5 +71,4 @@ else {
 		'title' => $text{'index_empty_title'},
 		'desc' => $text{'index_empty'} });
 	}
-print &ui_page_end();
 &ui_print_footer('/', $text{'index'});
